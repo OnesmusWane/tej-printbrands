@@ -71,7 +71,7 @@
         </nav>
 
         {{-- Mobile: cart + hamburger --}}
-        <div class="flex items-center gap-4 md:hidden">
+        <div class="flex items-center gap-3 md:hidden">
             <a href="{{ route('cart') }}" class="relative p-2 text-slate-600 transition-colors hover:text-cyan" aria-label="Cart">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
@@ -82,36 +82,91 @@
                     <span class="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-red text-[10px] font-bold text-white">{{ $cartCount }}</span>
                 @endif
             </a>
-            <button data-mobile-menu-button class="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 hover:text-cyan" type="button" aria-label="Toggle menu" aria-expanded="false">
-                <span data-menu-open-icon>@include('components.icon', ['name' => 'menu', 'class' => 'w-6 h-6'])</span>
-                <span data-menu-close-icon class="hidden">@include('components.icon', ['name' => 'x', 'class' => 'w-6 h-6'])</span>
+            <button data-mobile-menu-button class="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 hover:text-cyan" type="button" aria-label="Open menu" aria-expanded="false">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
         </div>
     </div>
+</header>
 
-    <div data-mobile-menu class="absolute left-0 top-full hidden w-full flex-col gap-2 border-t border-gray-100 bg-white px-4 py-4 shadow-xl md:hidden">
+{{-- ── Mobile nav overlay ─────────────────────────────────────────────────── --}}
+<div data-mobile-menu class="fixed inset-0 z-[60] hidden md:hidden" aria-modal="true" role="dialog">
+    {{-- Backdrop --}}
+    <div data-mobile-menu-backdrop class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+
+    {{-- Panel --}}
+    <div class="absolute inset-x-0 top-0 flex max-h-screen flex-col overflow-y-auto bg-white shadow-2xl">
+
+        {{-- Panel header --}}
+        <div class="flex items-center justify-between border-b border-gray-100 px-4 py-4">
+            <a href="{{ route('home') }}" class="flex items-center gap-2" data-mobile-menu-close>
+                @if (!empty($co['logo_url']))
+                    <img src="{{ $co['logo_url'] }}" alt="{{ $co['company_name'] ?? 'Tej Printbrands' }}" class="h-9 w-auto object-contain">
+                @else
+                    <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan text-xl font-bold text-white">TJ</span>
+                    <span class="text-xl font-bold text-dark">Tej <span class="text-cyan">Printbrands</span></span>
+                @endif
+            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('cart') }}" class="relative p-2 text-slate-600 transition-colors hover:text-cyan" aria-label="Cart">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+                        <line x1="3" y1="6" x2="21" y2="6" stroke-linecap="round"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 10a4 4 0 01-8 0"/>
+                    </svg>
+                    @if (($cartCount ?? 0) > 0)
+                        <span class="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-red text-[10px] font-bold text-white">{{ $cartCount }}</span>
+                    @endif
+                </a>
+                <button data-mobile-menu-button type="button" aria-label="Close menu" class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-dark">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+
+        {{-- User greeting (when logged in) --}}
         @auth
-            <div class="mb-2 flex items-center gap-3 border-b border-gray-100 px-4 pb-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-cyan text-sm font-bold text-white">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
+            <div class="flex items-center gap-3 border-b border-gray-100 px-6 py-4">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan text-sm font-bold text-white">
+                    {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                </div>
                 <div>
-                    <div class="font-semibold text-dark">{{ Auth::user()->name }}</div>
-                    <a href="{{ route('account.dashboard') }}" class="text-xs font-medium text-cyan">View Profile</a>
+                    <p class="font-semibold text-dark leading-tight">{{ Auth::user()->name }}</p>
+                    <a href="{{ route('account.dashboard') }}" class="text-xs font-medium text-cyan hover:text-cyan-700" data-mobile-menu-close>View Profile</a>
                 </div>
             </div>
         @endauth
-        @foreach ($links as $link)
-            <a href="{{ route($link['route']) }}" class="rounded-lg px-4 py-3 text-sm font-medium transition-colors {{ request()->routeIs($link['route']) ? 'bg-cyan-50 text-cyan' : 'text-slate-800 hover:bg-slate-50' }}">{{ $link['name'] }}</a>
-        @endforeach
-        @auth
-            <form action="{{ route('logout') }}" method="post" class="px-4">
-                @csrf
-                <button type="submit" class="py-2 text-left text-sm font-medium text-red">Sign Out</button>
-            </form>
-        @else
-            <a href="{{ route('login') }}" class="rounded-lg px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-50">Sign In / Register</a>
-        @endauth
-        <div class="mt-2 px-4">
-            <a href="{{ route('booking', ['type' => 'booking']) }}" class="block rounded-lg bg-cyan px-4 py-3 text-center text-sm font-semibold text-white">Book a Service</a>
+
+        {{-- Nav links --}}
+        <nav class="flex flex-col gap-1 px-4 py-4">
+            @foreach ($links as $link)
+                <a
+                    href="{{ route($link['route']) }}"
+                    data-mobile-menu-close
+                    class="rounded-xl px-4 py-3 text-sm font-medium transition-colors {{ request()->routeIs($link['route']) ? 'bg-cyan-50 text-cyan font-semibold' : 'text-slate-700 hover:bg-slate-50' }}"
+                >{{ $link['name'] }}</a>
+            @endforeach
+
+            @guest
+                <a href="{{ route('login') }}" data-mobile-menu-close class="rounded-xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    Sign In / Register
+                </a>
+            @endguest
+        </nav>
+
+        {{-- Bottom CTA --}}
+        <div class="mt-auto flex flex-col gap-3 border-t border-gray-100 px-4 pb-8 pt-4">
+            @auth
+                <form action="{{ route('logout') }}" method="post">
+                    @csrf
+                    <button type="submit" class="w-full rounded-xl border border-red/20 py-3 text-sm font-semibold text-red transition-colors hover:bg-red/5">
+                        Sign Out
+                    </button>
+                </form>
+            @endauth
+            <a href="{{ route('booking', ['type' => 'booking']) }}" data-mobile-menu-close class="block rounded-xl bg-cyan px-4 py-3.5 text-center text-sm font-bold text-white shadow-md shadow-cyan/20 transition hover:bg-cyan-600">
+                Book a Service
+            </a>
         </div>
     </div>
-</header>
+</div>

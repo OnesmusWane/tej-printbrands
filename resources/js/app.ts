@@ -5,20 +5,24 @@ const toggleClass = (element: Element | null, className: string, force?: boolean
 };
 
 const setupNavbar = () => {
-    const navbar = document.querySelector<HTMLElement>('[data-navbar]');
-    const button = document.querySelector<HTMLButtonElement>('[data-mobile-menu-button]');
-    const menu = document.querySelector<HTMLElement>('[data-mobile-menu]');
-    const openIcon = document.querySelector<HTMLElement>('[data-menu-open-icon]');
-    const closeIcon = document.querySelector<HTMLElement>('[data-menu-close-icon]');
+    const navbar   = document.querySelector<HTMLElement>('[data-navbar]');
+    const menu     = document.querySelector<HTMLElement>('[data-mobile-menu]');
+    const backdrop = document.querySelector<HTMLElement>('[data-mobile-menu-backdrop]');
+    const buttons  = document.querySelectorAll<HTMLButtonElement>('[data-mobile-menu-button]');
+    const closeLinks = document.querySelectorAll<HTMLElement>('[data-mobile-menu-close]');
 
     const setMenuOpen = (open: boolean) => {
         toggleClass(menu, 'hidden', !open);
-        toggleClass(openIcon, 'hidden', open);
-        toggleClass(closeIcon, 'hidden', !open);
-        button?.setAttribute('aria-expanded', String(open));
+        document.body.classList.toggle('overflow-hidden', open);
+        buttons.forEach(b => b.setAttribute('aria-expanded', String(open)));
     };
 
-    button?.addEventListener('click', () => setMenuOpen(menu?.classList.contains('hidden') ?? true));
+    buttons.forEach(b => b.addEventListener('click', () => {
+        setMenuOpen(menu?.classList.contains('hidden') ?? true);
+    }));
+
+    backdrop?.addEventListener('click', () => setMenuOpen(false));
+    closeLinks.forEach(el => el.addEventListener('click', () => setMenuOpen(false)));
 
     const onScroll = () => {
         const compact = window.scrollY > 20;
