@@ -8,7 +8,9 @@
     $ctaTertiary  = $cfg["cta_tertiary"]  ?? 'View Our Work';
 @endphp
 <section id="home" class="relative flex min-h-[90vh] items-center overflow-hidden bg-slate-950 pt-32 pb-24 lg:pt-44">
-    <img src="{{ $h?->image_url ?? asset('assets/images/printing.jpg') }}" alt="Professional printing equipment" class="absolute inset-0 h-full w-full object-cover">
+    @if (!empty($h?->image_url))
+        <img src="{{ $h->image_url }}" alt="Professional printing equipment" class="absolute inset-0 h-full w-full object-cover">
+    @endif
     <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/70 to-slate-900/25"></div>
     <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
 

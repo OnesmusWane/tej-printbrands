@@ -1,9 +1,9 @@
 @php
     $ct      = $siteSettings['contact']  ?? [];
     $socials = $siteSettings['socials']  ?? [];
-    $address = $ct['address'] ?? 'Nairobi, Kenya';
-    $phone   = $ct['phone']   ?? '+254 700 000 000';
-    $email   = $ct['email']   ?? 'hello@tejprintbrands.com';
+    $address = $ct['address'] ?? null;
+    $phone   = $ct['phone']   ?? null;
+    $email   = $ct['email']   ?? null;
 
     $socialLinks = [
         'facebook'  => ['label' => 'Facebook',  'icon' => 'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z'],
@@ -32,10 +32,11 @@
                 <span class="text-2xl font-bold tracking-tight text-white">Tej <span class="text-cyan">Printbrands</span></span>
             </a>
             <p class="mb-5 max-w-xs text-sm leading-relaxed text-gray-400">Premium graphic design, printing, and branding solutions that help your business stand out.</p>
+            @php $activeSocials = array_filter($socialLinks, fn($key) => !empty($socials[$key]), ARRAY_FILTER_USE_KEY); @endphp
+            @if (!empty($activeSocials))
             <div class="flex items-center gap-3">
-                @foreach ($socialLinks as $key => $social)
-                    @php $href = $socials[$key] ?? '#'; @endphp
-                    <a href="{{ $href }}" aria-label="{{ $social['label'] }}"
+                @foreach ($activeSocials as $key => $social)
+                    <a href="{{ $socials[$key] }}" aria-label="{{ $social['label'] }}" target="_blank" rel="noopener noreferrer"
                        class="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-gray-400 transition-colors hover:bg-cyan hover:text-white">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="{{ $social['icon'] }}"/>
@@ -43,6 +44,7 @@
                     </a>
                 @endforeach
             </div>
+            @endif
         </div>
 
         {{-- Quick Links --}}
@@ -66,23 +68,31 @@
         </div>
 
         {{-- Get in Touch --}}
+        @if ($address || $phone || $email)
         <div>
             <h4 class="mb-4 font-semibold text-white">Get in Touch</h4>
             <ul class="space-y-3 text-sm text-gray-400">
+                @if ($address)
                 <li class="flex items-start gap-3">
                     <svg class="mt-0.5 h-4 w-4 shrink-0 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     <span>{{ $address }}</span>
                 </li>
+                @endif
+                @if ($phone)
                 <li class="flex items-start gap-3">
                     <svg class="mt-0.5 h-4 w-4 shrink-0 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     <span>{{ $phone }}</span>
                 </li>
+                @endif
+                @if ($email)
                 <li class="flex items-start gap-3">
                     <svg class="mt-0.5 h-4 w-4 shrink-0 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     <span>{{ $email }}</span>
                 </li>
+                @endif
             </ul>
         </div>
+        @endif
     </div>
 
     <div class="border-t border-white/10">
