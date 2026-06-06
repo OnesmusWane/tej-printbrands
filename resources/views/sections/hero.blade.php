@@ -26,9 +26,4 @@
         </div>
     </div>
 
-    <div class="absolute bottom-0 left-0 z-20 w-full overflow-hidden leading-none">
-        <svg class="block h-[70px] w-full md:h-[110px]" viewBox="0 0 1200 120" preserveAspectRatio="none" aria-hidden="true">
-            <path class="fill-white" d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.08,130.83,121.32,201.3,114.5,242.4,110.6,282.8,99.9,321.39,56.44Z"/>
-        </svg>
-    </div>
 </section>
