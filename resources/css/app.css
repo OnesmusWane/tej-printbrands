@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.ts';
+@source inline("bg-emerald-500 bg-blue-600 bg-green-500 bg-orange-500 text-emerald-500 text-blue-600 text-green-500 text-orange-500 md:col-span-2 row-span-2 row-span-1");
+
+@theme {
+    --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Primary palette (kept for backward compat with existing views) */
+    --color-primary:   #00BCD4;
+    --color-secondary: #F44336;
+    --color-dark-cyan: #0097A7;
+
+    /* Reference design tokens */
+    --color-cyan:      #00BCD4;
+    --color-cyan-50:   #E0F7FA;
+    --color-cyan-100:  #B2EBF2;
+    --color-cyan-200:  #80DEEA;
+    --color-cyan-300:  #4DD0E1;
+    --color-cyan-400:  #26C6DA;
+    --color-cyan-500:  #00BCD4;
+    --color-cyan-600:  #00ACC1;
+    --color-cyan-700:  #0097A7;
+    --color-red:       #F44336;
+    --color-red-600:   #E53935;
+    --color-dark:      #1F2937;
+    --color-light:     #F9FAFB;
+}
+
+@keyframes fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@utility animate-fade-up {
+    animation: fade-up 0.7s ease-out both;
+}
+
+img {
+    background-color: #f1f5f9;
+}
+
+/* Form elements don't inherit color due to browser/Preflight reset */
+input,
+textarea,
+select {
+    color: black;
+    background-color: white;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #9ca3af;
+}
