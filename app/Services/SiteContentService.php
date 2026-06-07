@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BlogPost;
 use App\Models\Brand;
 use App\Models\Faq;
 use App\Models\GalleryItem;
@@ -29,7 +30,13 @@ class SiteContentService
             'testimonials' => $this->testimonials(),
             'brands' => $this->brands(),
             'premiumProducts' => $this->products(),
+            'recentBlogPosts' => $this->recentBlogPosts(),
         ];
+    }
+
+    public function recentBlogPosts(): Collection
+    {
+        return BlogPost::where('is_published', true)->latest('published_at')->limit(3)->get();
     }
 
     public function page(string $slug): ?SitePage

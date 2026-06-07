@@ -12,4 +12,5 @@
     @include('sections.portfolio',    ['sectionData' => $sec('portfolio')])
     @include('sections.testimonials', ['sectionData' => $sec('testimonials')])
     @include('sections.brands',       ['sectionData' => $sec('brands')])
+    @include('sections.blog')
 @endsection

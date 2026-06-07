@@ -7,9 +7,9 @@ import ImageUpload from '../components/ImageUpload.vue'
 const toast = useToastStore()
 
 const company  = ref({ company_name: '', tagline: '', description: '', logo_url: '', favicon_url: '' })
-const contact  = ref({ email: '', phone: '', support_email: '', hours: '', address: '', whatsapp_number: '', whatsapp_message: '' })
+const contact  = ref({ email: '', phone: '', phone_secondary: '', support_email: '', hours: '', address: '', website: '', whatsapp_number: '', whatsapp_message: '' })
 const socials  = ref({ facebook: '', instagram: '', twitter: '', linkedin: '', youtube: '', tiktok: '' })
-const business = ref({ currency: 'KES', tax_rate: '', mpesa_shortcode: '', mpesa_env: 'sandbox', mpesa_consumer_key: '', mpesa_consumer_secret: '', mpesa_passkey: '' })
+const business = ref({ currency: 'KES', tax_rate: '', mpesa_shortcode: '', paybill_account: '', mpesa_env: 'sandbox', mpesa_consumer_key: '', mpesa_consumer_secret: '', mpesa_passkey: '' })
 const password = ref({ current_password: '', password: '', password_confirmation: '' })
 const passwordErrors = ref<Record<string, string[]>>({})
 const showMpesaKeys = ref(false)
@@ -155,6 +155,14 @@ onMounted(load)
                             <label class="block text-xs font-semibold text-gray-600 mb-1.5">Business Hours</label>
                             <input v-model="contact.hours" placeholder="Mon-Fri 8am-6pm" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"/>
                         </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Phone 2 (Secondary)</label>
+                            <input v-model="contact.phone_secondary" placeholder="+254 700 000 001" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"/>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Website URL</label>
+                            <input v-model="contact.website" type="url" placeholder="https://www.tejprintbrands.com" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"/>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1.5">Address</label>
@@ -273,6 +281,11 @@ onMounted(load)
                                     <option value="sandbox">Sandbox (testing)</option>
                                     <option value="live">Live (production)</option>
                                 </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Paybill Account Number</label>
+                                <input v-model="business.paybill_account" placeholder="e.g. 5001411001" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"/>
+                                <p class="text-[11px] text-gray-400 mt-1">Account number shown on printed quotations and invoices.</p>
                             </div>
                         </div>
 

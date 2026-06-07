@@ -3,15 +3,16 @@
 @section('title', 'Book a Service or Request a Quote | Tej Printbrands')
 
 @php
-    $selectedPackage = old('package', request('package', ''));
-    // If arriving from a pricing package link, default to "booking"
-    $selectedType = old('request_type', request('type', $selectedPackage ? 'booking' : 'booking')) === 'quote' ? 'quote' : 'booking';
+    $selectedPackage    = old('package', request('package', ''));
+    $selectedType       = old('request_type', request('type', 'booking')) === 'quote' ? 'quote' : 'booking';
+    $preService         = old('service', request('service', ''));
+    $preSubService      = old('sub_service', request('sub_service', ''));
 @endphp
 
 @section('content')
     <section class="relative overflow-hidden bg-slate-950 pt-36 pb-20">
         <img src="{{ asset('assets/images/printing.jpg') }}" alt="Printing studio" class="absolute inset-0 h-full w-full object-cover opacity-35">
-        <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900/90 to-slate-900/70"></div>
+        <div class="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-900/90 to-slate-900/70"></div>
         <div class="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl">
                 <p class="mb-4 text-sm font-extrabold uppercase tracking-[0.25em] text-primary">Project Intake</p>
@@ -46,12 +47,12 @@
                     <div>
                         <span class="mb-3 block text-sm font-bold text-slate-700">What would you like to do?</span>
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <label class="cursor-pointer rounded-xl border p-4 transition has-[:checked]:border-primary has-[:checked]:bg-cyan-50">
+                            <label class="cursor-pointer rounded-xl border p-4 transition has-checked:border-primary has-checked:bg-cyan-50">
                                 <input type="radio" name="request_type" value="booking" class="sr-only" {{ $selectedType === 'booking' ? 'checked' : '' }}>
                                 <span class="block text-lg font-extrabold text-slate-900">Book a Service</span>
                                 <span class="mt-1 block text-sm text-slate-600">Reserve time for design, print, branding, or installation work.</span>
                             </label>
-                            <label class="cursor-pointer rounded-xl border p-4 transition has-[:checked]:border-secondary has-[:checked]:bg-red-50">
+                            <label class="cursor-pointer rounded-xl border p-4 transition has-checked:border-secondary has-checked:bg-red-50">
                                 <input type="radio" name="request_type" value="quote" class="sr-only" {{ $selectedType === 'quote' ? 'checked' : '' }}>
                                 <span class="block text-lg font-extrabold text-slate-900">Request a Quote</span>
                                 <span class="mt-1 block text-sm text-slate-600">Get a custom estimate for a project or bulk purchase.</span>
@@ -60,14 +61,27 @@
                         @error('request_type') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
+                    {{-- Pass services+sub_services map to JS --}}
+                    <script id="svc-map-data" type="application/json">@json($servicesWithSubs)</script>
+
                     <div class="grid gap-5 md:grid-cols-2">
-                        <label class="space-y-2 text-sm font-semibold text-slate-700">Service Needed
-                            <select name="service" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                @foreach ($bookingServices as $service)
-                                    <option value="{{ $service }}" @selected(old('service', request('service')) === $service)>{{ $service }}</option>
+                        <div class="space-y-2 text-sm font-semibold text-slate-700 md:col-span-2">
+                            <span>Service Category <span class="text-red-400">*</span></span>
+                            <select id="main-service-select" name="service" required class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                <option value="">— Select a service —</option>
+                                @foreach ($bookingServices as $svc)
+                                    <option value="{{ $svc }}" {{ $preService === $svc ? 'selected' : '' }}>{{ $svc }}</option>
                                 @endforeach
                             </select>
-                        </label>
+                        </div>
+
+                        <div id="sub-service-wrap" class="space-y-2 text-sm font-semibold text-slate-700 md:col-span-2 hidden">
+                            <span>Specific Service <span class="text-red-400">*</span></span>
+                            <select id="sub-service-select" name="sub_service" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                <option value="">— Select a specific service —</option>
+                            </select>
+                        </div>
+
                         <label class="space-y-2 text-sm font-semibold text-slate-700">Preferred Date
                             <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20">
                         </label>
@@ -123,4 +137,44 @@
             </aside>
         </div>
     </section>
+
+    <script>
+    (function () {
+        var mapEl  = document.getElementById('svc-map-data');
+        var mainSel = document.getElementById('main-service-select');
+        var subWrap = document.getElementById('sub-service-wrap');
+        var subSel  = document.getElementById('sub-service-select');
+        if (!mapEl || !mainSel || !subWrap || !subSel) return;
+
+        var servicesMap = JSON.parse(mapEl.textContent || '[]');
+        var preSubService = @json($preSubService);
+
+        function buildSubOptions(serviceTitle, preSelected) {
+            var svc = servicesMap.find(function (s) { return s.title === serviceTitle; });
+            var subs = (svc && svc.sub_services) ? svc.sub_services : [];
+
+            subSel.innerHTML = '<option value="">— Select a specific service —</option>';
+            subs.forEach(function (sub) {
+                var opt = document.createElement('option');
+                opt.value = sub;
+                opt.textContent = sub;
+                if (preSelected && sub === preSelected) opt.selected = true;
+                subSel.appendChild(opt);
+            });
+
+            var hasSubs = subs.length > 0;
+            subWrap.classList.toggle('hidden', !hasSubs);
+            subSel.required = hasSubs;
+        }
+
+        mainSel.addEventListener('change', function () {
+            buildSubOptions(mainSel.value, '');
+        });
+
+        // Initialise on load (handles pre-selected service from URL param)
+        if (mainSel.value) {
+            buildSubOptions(mainSel.value, preSubService);
+        }
+    })();
+    </script>
 @endsection

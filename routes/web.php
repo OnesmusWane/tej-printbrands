@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [SiteController::class, 'home'])->name('home');
 Route::get('/services', [SiteController::class, 'services'])->name('services');
+Route::get('/services/{slug}', [SiteController::class, 'serviceDetail'])->name('service.detail');
+Route::get('/blog', [SiteController::class, 'blog'])->name('blog');
+Route::get('/blog/{slug}', [SiteController::class, 'blogDetail'])->name('blog.detail');
 Route::get('/work', [SiteController::class, 'work'])->name('work');
 Route::get('/gallery', [SiteController::class, 'gallery'])->name('gallery');
 Route::get('/contact', [SiteController::class, 'contact'])->name('contact');

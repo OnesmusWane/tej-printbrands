@@ -32,6 +32,36 @@ class SiteController extends Controller
         ]));
     }
 
+    public function serviceDetail(string $slug): View
+    {
+        $service = \App\Models\Service::where('slug', $slug)->where('is_visible', true)->firstOrFail();
+        return view('pages.service-detail', array_merge($this->sharedData(), compact('service')));
+    }
+
+    public function blog(): View
+    {
+        $posts = \App\Models\BlogPost::where('is_published', true)
+            ->latest('published_at')
+            ->get();
+
+        $categories = $posts->pluck('category')->filter()->unique()->sort()->values()->all();
+
+        return view('pages.blog', array_merge($this->sharedData(), compact('posts', 'categories')));
+    }
+
+    public function blogDetail(string $slug): View
+    {
+        $post    = \App\Models\BlogPost::where('slug', $slug)->where('is_published', true)->firstOrFail();
+        $related = \App\Models\BlogPost::where('is_published', true)
+            ->where('id', '!=', $post->id)
+            ->when($post->category, fn($q) => $q->where('category', $post->category))
+            ->latest('published_at')
+            ->limit(3)
+            ->get();
+
+        return view('pages.blog-detail', array_merge($this->sharedData(), compact('post', 'related')));
+    }
+
     public function work(): View
     {
         return view('pages.work', array_merge($this->sharedData(), [
@@ -56,8 +86,17 @@ class SiteController extends Controller
 
     public function booking(): View
     {
+        $services = $this->content->services();
+        $servicesWithSubs = $services->map(fn($s) => [
+            'title'        => $s->title,
+            'sub_services' => collect($s->sub_services ?? [])->map(fn($sub) =>
+                is_string($sub) ? $sub : ($sub['title'] ?? '')
+            )->filter()->values()->all(),
+        ])->all();
+
         return view('pages.booking', array_merge($this->sharedData(), [
-            'bookingServices' => $this->content->services()->pluck('title')->all(),
+            'bookingServices'     => $services->pluck('title')->all(),
+            'servicesWithSubs'    => $servicesWithSubs,
         ]));
     }
 
@@ -66,6 +105,7 @@ class SiteController extends Controller
         $validated = $request->validate([
             'request_type'   => ['required', 'in:booking,quote'],
             'service'        => ['required', 'string', 'max:120'],
+            'sub_service'    => ['nullable', 'string', 'max:160'],
             'package'        => ['nullable', 'string', 'max:120'],
             'name'           => ['required', 'string', 'max:120'],
             'email'          => ['required', 'email', 'max:160'],
@@ -76,13 +116,17 @@ class SiteController extends Controller
             'message'        => ['required', 'string', 'max:1500'],
         ]);
 
+        $subServiceLabel = !empty($validated['sub_service'])
+            ? "{$validated['service']} — {$validated['sub_service']}"
+            : $validated['service'];
+
         if ($validated['request_type'] === 'quote') {
             // Quote requests go to quote_requests table; product field holds the service name
             $this->submissions->createQuoteRequest([
                 'name'    => $validated['name'],
                 'email'   => $validated['email'],
                 'phone'   => $validated['phone'],
-                'product' => $validated['service'],
+                'product' => $subServiceLabel,
                 'budget'  => $validated['budget'] ?? null,
                 'notes'   => $validated['message'],
                 'status'  => 'new',
@@ -100,7 +144,7 @@ class SiteController extends Controller
                 'client'      => $validated['name'],
                 'email'       => $validated['email'],
                 'phone'       => $validated['phone'],
-                'service'     => $validated['service'],
+                'service'     => $subServiceLabel,
                 'budget'      => $validated['budget'] ?? null,
                 'timeline'    => $validated['preferred_date'] ?? null,
                 'description' => $description,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, toRaw } from "vue";
 import api from "../api";
 import { useToastStore } from "../stores/toast";
 import ImageUpload from "../components/ImageUpload.vue";
@@ -13,7 +13,7 @@ interface Service {
     image_url: string;
     starting_price: string;
     features: string[] | string;
-    sub_services?: { title: string }[];
+    sub_services?: { title: string; description?: string; image_url?: string }[];
     is_visible: boolean;
     sort_order: number;
 }
@@ -66,8 +66,25 @@ async function load() {
 }
 
 function openNew() {
-    editing.value = { is_visible: true, features: [], sort_order: 0 };
+    editing.value = { is_visible: true, features: [], sort_order: 0, sub_services: [] };
     showModal.value = true;
+}
+
+function addSubService() {
+    if (!editing.value.sub_services) editing.value.sub_services = [];
+    editing.value.sub_services.push({ title: '', description: '', image_url: '' });
+}
+
+function removeSubService(index: number) {
+    editing.value.sub_services?.splice(index, 1);
+}
+
+function normalizeSubServices(raw: any[]): { title: string; description: string; image_url: string }[] {
+    return (raw ?? []).map(sub =>
+        typeof sub === 'string'
+            ? { title: sub, description: '', image_url: '' }
+            : { title: sub.title ?? '', description: sub.description ?? '', image_url: sub.image_url ?? '' }
+    );
 }
 
 function openEdit(s: Service) {
@@ -76,6 +93,7 @@ function openEdit(s: Service) {
         features: Array.isArray(s.features)
             ? s.features.join("\n")
             : (s.features ?? ""),
+        sub_services: normalizeSubServices(s.sub_services as any ?? []),
     };
     showModal.value = true;
 }
@@ -100,7 +118,8 @@ async function submit() {
                       .map((f) => f.trim())
                       .filter(Boolean)
                 : (editing.value.features ?? []);
-        const payload = { ...editing.value, features: featuresArr };
+        const rawSubs = (editing.value.sub_services ?? []).map(s => toRaw(s));
+        const payload = { ...editing.value, features: featuresArr, sub_services: rawSubs };
         if (editing.value.id) {
             await api.patch(`/services/${editing.value.id}`, payload as any);
             toast.add("Service updated.");
@@ -442,6 +461,33 @@ onMounted(load);
                                     placeholder="Feature one&#10;Feature two&#10;Feature three"
                                 ></textarea>
                             </div>
+                            {{-- Sub-services --}}
+                            <div class="border border-gray-200 rounded-xl p-4 space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-semibold text-gray-600">Sub-services</label>
+                                    <button type="button" @click="addSubService" class="inline-flex items-center gap-1 text-xs font-semibold text-cyan-600 hover:text-cyan-700">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                        Add Sub-service
+                                    </button>
+                                </div>
+                                <div v-if="!editing.sub_services?.length" class="text-xs text-gray-400 text-center py-2">No sub-services yet — click Add Sub-service.</div>
+                                <div v-for="(sub, idx) in editing.sub_services" :key="idx" class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <input v-model="sub.title" placeholder="Title *" required class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20" />
+                                        <button type="button" @click="removeSubService(idx)" class="text-red-400 hover:text-red-600 p-1 shrink-0">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
+                                    <input v-model="sub.description" placeholder="Short description (optional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20" />
+                                    <ImageUpload
+                                        :modelValue="editing.sub_services![idx].image_url ?? ''"
+                                        @update:modelValue="(url: string) => { if (editing.sub_services) editing.sub_services[idx].image_url = url }"
+                                        label="Image (optional)"
+                                        height="h-28"
+                                    />
+                                </div>
+                            </div>
+
                             <div class="flex items-center gap-3">
                                 <input
                                     type="checkbox"

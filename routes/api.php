@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Admin\BookingPaymentController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\QuotationController;
 use App\Http\Controllers\Admin\ServiceRequestController;
 use App\Models\SiteSetting;
@@ -91,6 +92,13 @@ Route::middleware(['web', 'auth', 'admin'])->prefix('admin')->name('api.admin.')
     Route::post('/admin-users', [UserController::class, 'store'])->name('admin-users.store');
     Route::patch('/admin-users/{user}', [UserController::class, 'update'])->name('admin-users.update');
     Route::delete('/admin-users/{user}', [UserController::class, 'destroy'])->name('admin-users.destroy');
+
+    // Projects
+    Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
+    Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
+    Route::patch('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
+    Route::post('/projects/{project}/add-job', [ProjectController::class, 'addJob'])->name('projects.add-job');
 
     Route::get('/{resource}', [AdminResourceController::class, 'index'])->name('resources.index');
     Route::post('/{resource}', [AdminResourceController::class, 'store'])->name('resources.store');

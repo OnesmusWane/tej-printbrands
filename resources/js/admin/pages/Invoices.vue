@@ -87,82 +87,154 @@ async function openView(inv: Invoice) {
   finally { viewLoading.value = false }
 }
 
-function printInvoice() {
+async function printInvoice() {
   if (!viewInv.value) return
   const inv = viewInv.value
-  const q = inv.quotation
-  const items = q?.items?.map(i => `
-    <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;">${i.description}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:center;">${i.quantity}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">KES ${Number(i.unit_price).toLocaleString()}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">KES ${Number(i.total).toLocaleString()}</td>
-    </tr>`).join('') ?? `<tr><td colspan="4" style="padding:16px;text-align:center;color:#9CA3AF;">${q?.service ?? 'Service'}</td></tr>`
 
-  const pmts = (inv.payments ?? []).map(p => `
+  const s: Record<string, any> = {}
+  try {
+    const { data } = await api.get('/site-settings')
+    for (const r of (Array.isArray(data) ? data : data.data ?? [])) {
+      s[r.key] = typeof r.value === 'string' ? JSON.parse(r.value) : r.value
+    }
+  } catch {}
+
+  const companyName    = s.company?.name || s.company?.company_name || 'Tej Printbrands'
+  const logoUrl        = s.company?.logo_url || ''
+  const address        = s.contact?.address || ''
+  const phone          = s.contact?.phone || ''
+  const phoneSecondary = s.contact?.phone_secondary || ''
+  const email          = s.contact?.email || ''
+  const website        = s.contact?.website || ''
+  const paybill        = s.business?.mpesa_shortcode || ''
+  const paybillAcct    = s.business?.paybill_account || ''
+
+  const fd = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+
+  const q = inv.quotation
+  const itemRows = q?.items?.length
+    ? q.items.map(i => `
+      <tr>
+        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;">${i.description}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:center;">${i.quantity}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;">KES ${Number(i.unit_price).toLocaleString()}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">KES ${Number(i.total).toLocaleString()}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:16px;text-align:center;color:#9CA3AF;font-style:italic;">${q?.service ?? 'Professional services'}</td></tr>`
+
+  const pmtRows = (inv.payments ?? []).map(p => `
     <tr>
-      <td style="padding:6px 8px;">${p.payment_number}</td>
-      <td style="padding:6px 8px;text-transform:capitalize;">${p.method}</td>
-      <td style="padding:6px 8px;">${p.reference ?? '-'}</td>
-      <td style="padding:6px 8px;text-align:right;">KES ${Number(p.amount).toLocaleString()}</td>
-      <td style="padding:6px 8px;">${p.paid_at ? new Date(p.paid_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '-'}</td>
+      <td style="padding:6px 10px;font-size:12px;">${p.payment_number}</td>
+      <td style="padding:6px 10px;font-size:12px;text-transform:capitalize;">${p.method}</td>
+      <td style="padding:6px 10px;font-size:12px;font-family:monospace;">${p.reference ?? '-'}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">KES ${Number(p.amount).toLocaleString()}</td>
+      <td style="padding:6px 10px;font-size:12px;">${p.paid_at ? fd(p.paid_at) : '-'}</td>
     </tr>`).join('')
 
   const balanceDue = Math.max(0, Number(inv.amount) - Number(inv.paid_amount ?? 0))
-  const html = `<!DOCTYPE html><html><head><title>Invoice ${inv.invoice_number}</title>
-  <style>body{font-family:Arial,sans-serif;color:#1F2937;margin:0;padding:32px;}
-  table{width:100%;border-collapse:collapse;}th{background:#f9fafb;padding:10px 12px;text-align:left;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;}
-  .header{border-bottom:3px solid #1F2937;padding-bottom:20px;margin-bottom:24px;}
-  .company{font-size:22px;font-weight:700;color:#00BCD4;}.badge-paid{color:#16a34a;background:#dcfce7;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;}
-  .badge-unpaid{color:#ea580c;background:#fff7ed;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;}
-  </style></head><body>
-  <div class="header">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-      <div><div class="company">Tej Printbrands</div><div style="font-size:12px;color:#6B7280;margin-top:4px;">Professional Print & Branding Solutions</div></div>
-      <div style="text-align:right;">
-        <div style="font-size:28px;font-weight:700;">INVOICE</div>
-        <div style="font-size:13px;color:#6B7280;"># ${inv.invoice_number}</div>
-      </div>
+  const statusColor = inv.status === 'paid' ? '#16a34a' : (inv.status === 'partial' ? '#d97706' : '#ea580c')
+  const statusBg    = inv.status === 'paid' ? '#dcfce7' : (inv.status === 'partial' ? '#fef3c7' : '#fff7ed')
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Invoice ${inv.invoice_number}</title>
+<style>
+@page{size:A4 portrait;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;color:#1F2937;background:#fff}
+table{width:100%;border-collapse:collapse}
+</style>
+</head><body>
+
+<!-- HEADER: company left, INVOICE right -->
+<div style="padding:28px 36px 22px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a237e;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    ${logoUrl ? `<img src="${logoUrl}" style="width:55px;height:55px;object-fit:contain;" alt="">` : ''}
+    <div>
+      <div style="font-size:21px;font-weight:900;color:#1a237e;letter-spacing:2px;">${companyName.toUpperCase()}</div>
+      <div style="font-size:10px;color:#6B7280;margin-top:3px;">${address}</div>
+      <div style="font-size:10px;color:#6B7280;">${phone}${phoneSecondary ? ' / ' + phoneSecondary : ''}</div>
     </div>
   </div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:24px;">
-    <div style="background:#f9fafb;padding:16px;border-radius:8px;min-width:220px;">
-      <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Bill To</div>
-      <div style="font-weight:600;">${inv.client}</div>
-      <div style="color:#6B7280;">${inv.email ?? ''}</div>
-    </div>
-    <div style="text-align:right;font-size:13px;">
-      <div><strong>Date:</strong> ${new Date(inv.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
-      ${inv.due_date ? `<div style="margin-top:4px;"><strong>Due:</strong> ${new Date(inv.due_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>` : ''}
-      <div style="margin-top:8px;"><span class="${inv.status === 'paid' ? 'badge-paid' : 'badge-unpaid'}">${inv.status.toUpperCase()}</span></div>
+  <div style="text-align:right;">
+    <div style="font-size:52px;font-weight:900;color:#e5e7eb;letter-spacing:6px;line-height:.9;">INVOICE</div>
+    <div style="font-size:14px;font-weight:700;color:#1a237e;margin-top:4px;">${inv.invoice_number}</div>
+    <div style="margin-top:6px;">
+      <span style="background:${statusBg};color:${statusColor};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;">${inv.status.toUpperCase()}</span>
     </div>
   </div>
-  ${q?.items?.length ? `
+</div>
+
+<!-- DETAILS ROW -->
+<div style="display:flex;background:#f8f9fa;border-bottom:1px solid #e5e7eb;">
+  <div style="padding:16px 36px;border-right:1px solid #e5e7eb;flex:1;">
+    <div style="font-size:9px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Invoice To</div>
+    <div style="font-size:15px;font-weight:700;">${inv.client}</div>
+    <div style="font-size:12px;color:#6B7280;margin-top:2px;">${inv.email ?? ''}</div>
+  </div>
+  <div style="padding:16px 36px;min-width:200px;text-align:right;">
+    <div style="font-size:12px;margin-bottom:4px;"><span style="color:#9CA3AF;">Date:&nbsp;</span><strong>${fd(inv.created_at)}</strong></div>
+    ${inv.due_date ? `<div style="font-size:12px;margin-bottom:4px;"><span style="color:#9CA3AF;">Due:&nbsp;</span><strong>${fd(inv.due_date)}</strong></div>` : ''}
+  </div>
+</div>
+
+<!-- BODY -->
+<div style="padding:24px 36px;">
+
+  <!-- Items table -->
   <table style="margin-bottom:20px;">
-    <thead><tr><th>Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Total</th></tr></thead>
-    <tbody>${items}</tbody>
-  </table>` : ''}
+    <thead>
+      <tr style="background:#1F2937;">
+        <th style="padding:10px 14px;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Description</th>
+        <th style="padding:10px 14px;color:#fff;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Qty</th>
+        <th style="padding:10px 14px;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Unit Price</th>
+        <th style="padding:10px 14px;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Total</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+
+  <!-- Totals -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
-    <table style="width:260px;border-collapse:collapse;">
-      <tr><td style="padding:6px 12px;">Amount</td><td style="text-align:right;padding:6px 12px;">KES ${Number(inv.amount).toLocaleString()}</td></tr>
-      <tr><td style="padding:6px 12px;">Paid</td><td style="text-align:right;padding:6px 12px;color:#16a34a;">KES ${Number(inv.paid_amount ?? 0).toLocaleString()}</td></tr>
-      <tr style="font-weight:700;border-top:2px solid #1F2937;"><td style="padding-top:8px;padding-left:12px;">Balance Due</td><td style="text-align:right;padding-top:8px;padding-right:12px;color:#00BCD4;">KES ${balanceDue.toLocaleString()}</td></tr>
+    <table style="width:260px;">
+      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;">Amount</td><td style="padding:7px 14px;font-size:13px;text-align:right;">KES ${Number(inv.amount).toLocaleString()}</td></tr>
+      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;color:#16a34a;">Paid</td><td style="padding:7px 14px;font-size:13px;text-align:right;color:#16a34a;">KES ${Number(inv.paid_amount ?? 0).toLocaleString()}</td></tr>
+      <tr style="background:#1F2937;color:#fff;font-weight:700;"><td style="padding:10px 14px;">Balance Due</td><td style="padding:10px 14px;text-align:right;color:#00BCD4;">KES ${balanceDue.toLocaleString()}</td></tr>
     </table>
   </div>
-  ${pmts ? `
+
+  <!-- Payment info -->
+  <div style="background:#EFF6FF;border-left:4px solid #00BCD4;border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:20px;">
+    <div style="font-size:10px;text-transform:uppercase;color:#1a237e;font-weight:700;letter-spacing:1.5px;margin-bottom:10px;">Payment Information</div>
+    <div style="display:flex;gap:40px;">
+      <div><div style="font-size:10px;color:#6B7280;text-transform:uppercase;">Paybill</div><div style="font-size:20px;font-weight:900;color:#1a237e;">${paybill || '&mdash;'}</div></div>
+      <div><div style="font-size:10px;color:#6B7280;text-transform:uppercase;">Account</div><div style="font-size:20px;font-weight:900;color:#1a237e;">${paybillAcct || '&mdash;'}</div></div>
+    </div>
+  </div>
+
+  <!-- Payment history -->
+  ${pmtRows ? `
   <div style="margin-bottom:16px;">
-    <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#374151;">Payment History</div>
-    <table style="width:100%;font-size:12px;">
-      <thead><tr><th>Ref</th><th>Method</th><th>Code</th><th style="text-align:right;">Amount</th><th>Date</th></tr></thead>
-      <tbody>${pmts}</tbody>
+    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Payment History</div>
+    <table style="font-size:12px;">
+      <thead><tr style="background:#f9fafb;"><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Ref #</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Method</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Code</th><th style="padding:8px 10px;text-align:right;font-size:11px;color:#6B7280;">Amount</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Date</th></tr></thead>
+      <tbody>${pmtRows}</tbody>
     </table>
   </div>` : ''}
-  <div style="font-size:11px;color:#9CA3AF;border-top:1px solid #f0f0f0;padding-top:12px;text-align:center;">
-    Tej Printbrands · Thank you for your business
+</div>
+
+<!-- FOOTER -->
+<div style="background:#1F2937;padding:12px 36px;display:flex;justify-content:space-between;align-items:center;">
+  <div style="color:rgba(255,255,255,.6);font-size:11px;">${companyName} &middot; Thank you for your business</div>
+  <div style="color:rgba(255,255,255,.8);font-size:11px;text-align:right;">
+    <div style="color:#fff;font-weight:600;">${email}</div>
+    ${website ? `<div style="color:#fff;">${website}</div>` : ''}
   </div>
-  </body></html>`
+</div>
+
+</body></html>`
+
   const win = window.open('', '_blank')
-  if (win) { win.document.write(html); win.document.close(); win.print() }
+  if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 250) }
 }
 
 // ─── invoice status update ────────────────────────────────────────────────────

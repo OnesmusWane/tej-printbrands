@@ -159,65 +159,151 @@ async function openView(q: Quotation) {
     }
 }
 
-function printQuotation() {
+async function printQuotation() {
     if (!viewQ.value) return;
     const q = viewQ.value;
-    const items = (q.items ?? [])
-        .map(
-            (i) => `
-    <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;">${i.description}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:center;">${i.quantity}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">KES ${Number(i.unit_price).toLocaleString()}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">KES ${Number(i.total).toLocaleString()}</td>
-    </tr>`,
-        )
-        .join("");
-    const html = `<!DOCTYPE html><html><head><title>Quotation ${q.quote_number}</title>
-  <style>body{font-family:Arial,sans-serif;color:#1F2937;margin:0;padding:32px;}
-  table{width:100%;border-collapse:collapse;}th{background:#f9fafb;padding:10px 12px;text-align:left;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;}
-  .header{border-bottom:3px solid #00BCD4;padding-bottom:20px;margin-bottom:24px;}
-  .company{font-size:22px;font-weight:700;color:#00BCD4;}.totals td{padding:6px 12px;}
-  </style></head><body>
-  <div class="header">
-    <div class="company">Tej Printbrands</div>
-    <div style="font-size:12px;color:#6B7280;margin-top:4px;">Professional Print & Branding Solutions</div>
-  </div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:24px;">
-    <div>
-      <div style="font-size:24px;font-weight:700;color:#1F2937;">QUOTATION</div>
-      <div style="font-size:13px;color:#6B7280;margin-top:4px;"># ${q.quote_number}</div>
+
+    const s: Record<string, any> = {};
+    try {
+        const { data } = await api.get('/site-settings');
+        for (const r of (Array.isArray(data) ? data : data.data ?? [])) {
+            s[r.key] = typeof r.value === 'string' ? JSON.parse(r.value) : r.value;
+        }
+    } catch {}
+
+    const companyName    = s.company?.name || s.company?.company_name || 'Tej Printbrands';
+    const logoUrl        = s.company?.logo_url || '';
+    const address        = s.contact?.address || 'P.O. BOX 4052-00100, Nairobi';
+    const phone          = s.contact?.phone || '';
+    const phoneSecondary = s.contact?.phone_secondary || '';
+    const email          = s.contact?.email || '';
+    const paybill        = s.business?.mpesa_shortcode || '';
+    const paybillAcct    = s.business?.paybill_account || '';
+
+    const addrParts = address.split(',').map((a: string) => a.trim()).filter(Boolean);
+    const addr1 = addrParts[0] || '';
+    const addr2 = addrParts.slice(1).join(', ');
+    const contactLine = [phone, phoneSecondary].filter(Boolean).join(' / ') || email;
+
+    const fd = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    const itemRows = (q.items ?? []).map(i => `
+        <tr>
+          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;">${i.description}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;text-align:center;">${i.quantity}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">KES ${Number(i.unit_price).toLocaleString()}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">KES ${Number(i.total).toLocaleString()}</td>
+        </tr>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Quotation ${q.quote_number}</title>
+<style>@page{size:A4 portrait;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#1F2937;background:#fff}table{width:100%;border-collapse:collapse}</style>
+</head><body>
+
+<!-- ═══ HEADER: blue left | diagonal | white right ═══ -->
+<div style="position:relative;height:145px;overflow:hidden;background:#fff;">
+  <!-- Full-width dark blue base (left portion) -->
+  <div style="position:absolute;inset:0;background:#1a237e;"></div>
+  <!-- Diagonal band: cyan (top) + red (bottom), as a gradient-filled polygon -->
+  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,#00BCD4 58%,#e53935 58%);clip-path:polygon(36% 0,60% 0,48% 100%,22% 100%);z-index:1;"></div>
+  <!-- White right section — covers everything from 60% onward -->
+  <div style="position:absolute;right:0;top:0;width:40%;height:100%;background:#fff;z-index:2;display:flex;flex-direction:column;justify-content:center;padding:16px 22px;">
+    <div style="font-size:30px;font-weight:900;color:#1F2937;letter-spacing:3px;margin-bottom:10px;">QUOTATION</div>
+    <div style="border:1px solid #ccc;font-size:11px;overflow:hidden;">
+      <div style="display:flex;border-bottom:1px solid #ccc;">
+        <div style="width:88px;padding:4px 8px;background:#f5f5f5;border-right:1px solid #ccc;color:#555;flex-shrink:0;">Date:</div>
+        <div style="padding:4px 8px;">${fd(q.created_at)}</div>
+      </div>
+      <div style="display:flex;border-bottom:1px solid #ccc;">
+        <div style="width:88px;padding:4px 8px;background:#f5f5f5;border-right:1px solid #ccc;color:#555;flex-shrink:0;">Quote:</div>
+        <div style="padding:4px 8px;">${q.quote_number}</div>
+      </div>
+      <div style="display:flex;">
+        <div style="width:88px;padding:4px 8px;background:#f5f5f5;border-right:1px solid #ccc;color:#555;flex-shrink:0;">Customer ID:</div>
+        <div style="padding:4px 8px;">${q.client}</div>
+      </div>
     </div>
-    <div style="text-align:right;font-size:13px;">
-      <div><strong>Date:</strong> ${new Date(q.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
-      <div style="margin-top:4px;"><strong>Status:</strong> ${q.status.charAt(0).toUpperCase() + q.status.slice(1)}</div>
+  </div>
+  <!-- Company info over blue area -->
+  <div style="position:absolute;left:18px;top:0;height:100%;display:flex;align-items:center;gap:12px;z-index:3;">
+    <div style="width:70px;height:70px;border-radius:50%;background:#fff;overflow:hidden;border:3px solid rgba(255,255,255,.35);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+      ${logoUrl ? `<img src="${logoUrl}" style="width:64px;height:64px;object-fit:contain;" alt="">` : `<span style="font-size:24px;font-weight:900;color:#1a237e;">T</span>`}
+    </div>
+    <div style="color:#fff;">
+      <div style="font-size:14px;font-weight:900;letter-spacing:1.5px;">${companyName.toUpperCase()}</div>
+      <div style="font-size:10px;opacity:.85;margin-top:4px;">${addr1}</div>
+      ${addr2 ? `<div style="font-size:10px;opacity:.85;">${addr2}</div>` : ''}
     </div>
   </div>
-  <div style="margin-bottom:24px;background:#f9fafb;padding:16px;border-radius:8px;">
-    <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Bill To</div>
-    <div style="font-weight:600;">${q.client}</div>
-    <div style="color:#6B7280;">${q.email}</div>
-    ${q.service ? `<div style="color:#6B7280;margin-top:4px;">Service: ${q.service}</div>` : ""}
-  </div>
-  <table style="margin-bottom:24px;">
-    <thead><tr><th>Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Total</th></tr></thead>
-    <tbody>${items}</tbody>
+</div>
+
+<!-- ═══ ITEMS TABLE ═══ -->
+<div style="padding:20px 20px 8px;">
+  <table>
+    <thead>
+      <tr style="background:#1F2937;color:#fff;">
+        <th style="padding:10px 14px;text-align:left;font-size:12px;letter-spacing:.5px;">ITEM</th>
+        <th style="padding:10px 14px;text-align:center;font-size:12px;letter-spacing:.5px;">QTY</th>
+        <th style="padding:10px 8px;text-align:right;font-size:11px;line-height:1.3;">UNIT<br>PRICE</th>
+        <th style="padding:10px 14px;text-align:right;font-size:12px;letter-spacing:.5px;">TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}</tbody>
   </table>
-  <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
-    <table style="width:260px;" class="totals">
-      <tr><td>Subtotal</td><td style="text-align:right;">KES ${Number(q.subtotal).toLocaleString()}</td></tr>
-      <tr><td>VAT (16%)</td><td style="text-align:right;">KES ${Number(q.tax).toLocaleString()}</td></tr>
-      <tr style="font-weight:700;border-top:2px solid #1F2937;"><td style="padding-top:8px;">Total</td><td style="text-align:right;padding-top:8px;color:#00BCD4;">KES ${Number(q.total).toLocaleString()}</td></tr>
+
+  <!-- Totals right-aligned -->
+  <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+    <table style="width:260px;">
+      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">Subtotal</td><td style="padding:6px 14px;font-size:12px;text-align:right;">KES ${Number(q.subtotal).toLocaleString()}</td></tr>
+      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">VAT (16%)</td><td style="padding:6px 14px;font-size:12px;text-align:right;">KES ${Number(q.tax).toLocaleString()}</td></tr>
+      <tr style="background:#1F2937;"><td style="padding:9px 14px;color:#fff;font-weight:700;font-size:13px;">TOTAL</td><td style="padding:9px 14px;color:#00BCD4;font-weight:700;font-size:13px;text-align:right;">KES ${Number(q.total).toLocaleString()}</td></tr>
     </table>
   </div>
-  ${q.terms ? `<div style="font-size:12px;color:#6B7280;border-top:1px solid #f0f0f0;padding-top:16px;"><strong>Terms & Conditions:</strong><br>${q.terms}</div>` : ""}
-  </body></html>`;
-    const win = window.open("", "_blank");
-    if (win) {
-        win.document.write(html);
-        win.document.close();
-        win.print();
-    }
+
+  ${q.terms ? `<div style="margin-top:14px;font-size:11px;color:#6B7280;padding-top:10px;border-top:1px solid #e5e7eb;"><strong>Terms &amp; Conditions:</strong> ${q.terms}</div>` : ''}
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div style="padding:14px 20px 0;">
+  <!-- Payment info box -->
+  <div style="display:inline-block;margin-bottom:16px;">
+    <div style="background:#1F2937;color:#fff;padding:5px 14px;font-size:12px;font-weight:700;display:inline-block;margin-bottom:3px;">Payment Info:</div>
+    <div style="font-size:12px;padding:2px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
+    <div style="font-size:12px;padding:2px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>
+  </div>
+</div>
+
+<!-- Bottom decorative strip (mirrors header: cyan left, red right, social icons) -->
+<div style="position:relative;height:46px;overflow:hidden;margin-top:4px;">
+  <!-- Red background -->
+  <div style="position:absolute;inset:0;background:#e53935;"></div>
+  <!-- Cyan left section with diagonal right edge -->
+  <div style="position:absolute;inset:0;background:#00BCD4;clip-path:polygon(0 0,70% 0,56% 100%,0 100%);z-index:1;"></div>
+  <!-- Social icons + contact on the right -->
+  <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;gap:6px;">
+    <div style="width:27px;height:27px;border-radius:50%;background:#25D366;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="13" height="13" fill="white" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+    </div>
+    <div style="width:27px;height:27px;border-radius:50%;background:#1877F2;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="12" height="12" fill="white" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+    </div>
+    <div style="width:27px;height:27px;border-radius:50%;background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="12" height="12" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+    </div>
+    <div style="width:27px;height:27px;border-radius:50%;background:#010101;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="12" height="12" fill="white" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.22 6.22 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.37a8.16 8.16 0 004.77 1.53V6.47a4.85 4.85 0 01-1-.22z"/></svg>
+    </div>
+    <div style="width:27px;height:27px;border-radius:50%;background:#1DA1F2;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="12" height="12" fill="white" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+    </div>
+    <span style="color:#fff;font-size:12px;font-weight:700;margin-left:5px;">${contactLine}</span>
+  </div>
+</div>
+
+</body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 250); }
 }
 
 // ─── status actions ────────────────────────────────────────────────────────

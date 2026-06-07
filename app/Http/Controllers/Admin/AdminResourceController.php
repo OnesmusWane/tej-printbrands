@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminResourceRequest;
+use App\Models\BlogPost;
 use App\Models\Brand;
 use App\Models\ContactMessage;
 use App\Models\Faq;
@@ -35,6 +36,7 @@ use Illuminate\Http\Request;
 class AdminResourceController extends Controller
 {
     private const MODELS = [
+        'blog-posts' => BlogPost::class,
         'site-pages' => SitePage::class,
         'site-sections' => SiteSection::class,
         'site-settings' => SiteSetting::class,

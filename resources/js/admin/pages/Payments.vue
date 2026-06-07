@@ -133,6 +133,146 @@ async function submitPayment() {
   } finally { saving.value = false }
 }
 
+function amountInWords(n: number): string {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+  function tw(num: number): string {
+    if (num === 0) return ''
+    if (num < 20) return ones[num]
+    if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? '-' + ones[num % 10] : '')
+    if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + tw(num % 100) : '')
+    if (num < 1000000) return tw(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + tw(num % 1000) : '')
+    return tw(Math.floor(num / 1000000)) + ' Million' + (num % 1000000 ? ' ' + tw(num % 1000000) : '')
+  }
+  const whole = Math.floor(n)
+  const cents = Math.round((n - whole) * 100)
+  return (tw(whole) || 'Zero') + ' Shillings' + (cents > 0 ? ' and ' + tw(cents) + ' Cents' : ' Only')
+}
+
+async function printReceipt(pmt: Payment) {
+  const s: Record<string, any> = {}
+  try {
+    const { data } = await api.get('/site-settings')
+    for (const r of (Array.isArray(data) ? data : data.data ?? [])) {
+      s[r.key] = typeof r.value === 'string' ? JSON.parse(r.value) : r.value
+    }
+  } catch {}
+
+  const companyName    = s.company?.name || s.company?.company_name || 'Tej Printbrands'
+  const logoUrl        = s.company?.logo_url || ''
+  const phone          = s.contact?.phone || ''
+  const phoneSecondary = s.contact?.phone_secondary || ''
+  const email          = s.contact?.email || ''
+  const website        = s.contact?.website || ''
+
+  const receiptNo  = pmt.payment_number ?? `RCT-${pmt.id}`
+  const clientName = pmt.client ?? pmt.client_name ?? ''
+  const amount     = Number(pmt.amount ?? 0)
+  const method     = (pmt.method ?? pmt.payment_method ?? '').toLowerCase().replace(/[\s-]/g, '_')
+  const reference  = pmt.reference ?? ''
+  const paidDate   = new Date(pmt.paid_at ?? pmt.payment_date ?? pmt.created_at ?? '').toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+  const invoiceRef = pmt.invoice_number ?? (pmt.invoice_id ? `Invoice #${pmt.invoice_id}` : '')
+
+  const isCash   = method === 'cash'
+  const isMpesa  = method === 'mpesa'
+  const isCheque = method === 'bank_transfer' || method === 'cheque'
+  const box = (checked: boolean) => checked
+    ? `<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #1a237e;background:#1a237e;margin-right:3px;vertical-align:middle;text-align:center;line-height:12px;font-size:11px;color:#fff;">&#10003;</span>`
+    : `<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #555;margin-right:3px;vertical-align:middle;"></span>`
+  const dotLine = (len = 280) => `<span style="display:inline-block;width:${len}px;border-bottom:1.5px dotted #555;vertical-align:bottom;margin-left:6px;"></span>`
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Receipt ${receiptNo}</title>
+<style>
+@page{size:A5 landscape;margin:12mm 14mm}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;font-size:13px}
+</style>
+</head><body>
+
+<!-- TOP HEADER -->
+<div style="display:flex;align-items:stretch;border:2px solid #1a237e;margin-bottom:14px;">
+  <!-- Logo block -->
+  <div style="padding:10px 14px;border-right:2px solid #1a237e;display:flex;align-items:center;justify-content:center;min-width:90px;">
+    ${logoUrl
+      ? `<img src="${logoUrl}" style="max-width:72px;max-height:56px;object-fit:contain;" alt="">`
+      : `<div style="font-size:16px;font-weight:900;color:#1a237e;letter-spacing:1px;">${companyName.split(' ')[0].toUpperCase()}</div>`}
+  </div>
+  <!-- Receipt title -->
+  <div style="padding:10px 20px;border-right:2px solid #1a237e;display:flex;align-items:center;justify-content:center;flex:1;">
+    <div style="text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#1a237e;letter-spacing:6px;">RECEIPT</div>
+      <div style="font-size:10px;color:#6B7280;margin-top:2px;">No. ${receiptNo}</div>
+    </div>
+  </div>
+  <!-- Contact block -->
+  <div style="padding:10px 14px;display:flex;flex-direction:column;justify-content:center;font-size:11px;min-width:170px;">
+    <div style="margin-bottom:3px;"><strong>Tel:</strong> ${phone}${phoneSecondary ? ' / ' + phoneSecondary : ''}</div>
+    ${website ? `<div style="margin-bottom:3px;"><strong>Web:</strong> ${website}</div>` : ''}
+    <div><strong>Email:</strong> ${email}</div>
+  </div>
+</div>
+
+<!-- DATE ROW -->
+<div style="display:flex;justify-content:flex-end;margin-bottom:10px;font-size:12px;">
+  <span><strong>Date:</strong> ${paidDate}</span>
+</div>
+
+<!-- RECEIVED FROM -->
+<div style="display:flex;align-items:flex-end;margin-bottom:9px;">
+  <span style="white-space:nowrap;font-weight:600;">Received from</span>
+  <span style="flex:1;border-bottom:1.5px dotted #555;margin:0 8px;min-width:100px;">&nbsp;${clientName}&nbsp;</span>
+  <div style="border:1.5px solid #1a237e;padding:5px 12px;min-width:110px;text-align:center;font-weight:700;font-size:13px;">
+    Kshs &nbsp;<span style="font-size:15px;">${amount.toLocaleString()}</span>
+  </div>
+</div>
+
+<!-- SHILLINGS IN WORDS -->
+<div style="display:flex;align-items:flex-end;margin-bottom:9px;">
+  <span style="white-space:nowrap;font-weight:600;">Kenyan Shillings</span>
+  ${dotLine(330)}
+  <span style="white-space:nowrap;margin-left:6px;font-size:11px;font-style:italic;">${amountInWords(amount)}</span>
+</div>
+
+<!-- DESCRIPTION -->
+<div style="display:flex;align-items:flex-end;margin-bottom:9px;">
+  <span style="white-space:nowrap;color:#555;">(description of goods/services)</span>
+  ${dotLine(260)}
+</div>
+
+<!-- BEING PAYMENT OF -->
+<div style="display:flex;align-items:flex-end;margin-bottom:16px;">
+  <span style="white-space:nowrap;font-weight:600;">Being payment of</span>
+  <span style="flex:1;border-bottom:1.5px dotted #555;margin:0 8px;">&nbsp;${invoiceRef}&nbsp;</span>
+  ${reference ? `<span style="font-size:11px;color:#555;">Ref: ${reference}</span>` : ''}
+</div>
+
+<!-- PAYMENT METHOD + SIGNATURE ROW -->
+<div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:1.5px solid #1a237e;padding-top:10px;">
+  <div style="font-size:13px;">
+    ${box(isCash)} <span style="margin-right:16px;">Cash</span>
+    ${box(isMpesa)} <span style="margin-right:16px;">M-Pesa</span>
+    ${box(isCheque)} Cheque No. <span style="display:inline-block;width:90px;border-bottom:1.5px dotted #555;margin-left:4px;">&nbsp;${isCheque ? reference : ''}&nbsp;</span>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:11px;color:#555;margin-bottom:4px;">Authorised Signature</div>
+    <div style="width:130px;border-bottom:1.5px solid #555;"></div>
+    <div style="font-size:12px;font-weight:700;margin-top:4px;color:#1a237e;">FOR: ${companyName.split(' ')[0].toUpperCase()}</div>
+  </div>
+</div>
+
+<!-- TAGLINE -->
+<div style="margin-top:12px;border-top:2px solid #1a237e;padding-top:8px;text-align:center;font-size:9px;color:#6B7280;text-transform:uppercase;letter-spacing:2px;">
+  Graphic Design &bull; T-Shirts &bull; General Branding &bull; Digital Printing &bull; Signage &bull; Promotional Items
+</div>
+
+</body></html>`
+
+  const win = window.open('', '_blank')
+  if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 250) }
+}
+
 onMounted(async () => {
   try {
     const [pRes, iRes] = await Promise.all([api.get('/payments'), api.get('/invoices?status=unpaid&per_page=200')])
@@ -240,6 +380,7 @@ onMounted(async () => {
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="px-6 py-4"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
@@ -268,6 +409,14 @@ onMounted(async () => {
                 </td>
                 <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ pmt.reference ?? '-' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ fmtDate(pmt.paid_at ?? pmt.payment_date ?? pmt.created_at) }}</td>
+                <td class="px-6 py-4">
+                  <button @click="printReceipt(pmt)" title="Print Receipt"
+                    class="p-1.5 rounded-lg text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>

@@ -17,28 +17,47 @@
     </section>
 
     <section class="bg-white py-24">
-        <div class="mx-auto max-w-7xl space-y-24 px-4 sm:px-6 lg:px-8">
-            @foreach ($detailedServices as $service)
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-24">
+            @forelse ($detailedServices as $i => $service)
+                @php
+                    $flip     = $i % 2 !== 0;
+                    $features = is_array($service->features) ? $service->features : (json_decode($service->features ?? '[]', true) ?? []);
+                @endphp
                 <div class="grid items-center gap-12 lg:grid-cols-2">
-                    <div class="{{ $service['reverse'] ? 'lg:order-2' : '' }}">
-                        <div class="relative aspect-[4/3] overflow-hidden rounded-2xl shadow-2xl">
-                            <img src="{{ $service['image'] }}" alt="{{ $service['title'] }}" class="h-full w-full object-cover">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent"></div>
-                            <div class="absolute bottom-6 left-6 flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-white shadow-lg">@include('components.icon', ['name' => $service['icon'], 'class' => 'w-7 h-7'])</div>
-                        </div>
+                    {{-- Image --}}
+                    <div class="{{ $flip ? 'lg:order-2' : '' }} overflow-hidden rounded-2xl shadow-xl aspect-4/3 bg-slate-100">
+                        @if ($service->image_url)
+                            <img src="{{ $service->image_url }}" alt="{{ $service->title }}" class="h-full w-full object-cover">
+                        @else
+                            <div class="flex h-full w-full items-center justify-center bg-linear-to-br from-cyan-50 to-slate-100">
+                                <svg class="w-16 h-16 text-cyan-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            </div>
+                        @endif
                     </div>
-                    <div class="{{ $service['reverse'] ? 'lg:order-1' : '' }}">
-                        <h2 class="mb-6 text-3xl font-extrabold text-slate-900 md:text-4xl">{{ $service['title'] }}</h2>
-                        <p class="mb-8 text-lg leading-relaxed text-slate-600">{{ $service['description'] }}</p>
-                        <ul class="mb-8 space-y-3">
-                            @foreach ($service['features'] as $feature)
-                                <li class="flex items-center gap-3 font-semibold text-slate-700">@include('components.icon', ['name' => 'check', 'class' => 'w-5 h-5 text-primary shrink-0']) {{ $feature }}</li>
-                            @endforeach
-                        </ul>
-                        <a href="{{ route('booking', ['type' => 'quote', 'service' => $service['title']]) }}" class="inline-flex items-center gap-2 font-extrabold text-primary transition hover:text-dark-cyan">Inquire about this service @include('components.icon', ['name' => 'arrow-right', 'class' => 'w-5 h-5'])</a>
+
+                    {{-- Content --}}
+                    <div class="{{ $flip ? 'lg:order-1' : '' }}">
+                        <h2 class="mb-4 text-3xl font-extrabold text-slate-900 lg:text-4xl">{{ $service->title }}</h2>
+                        <p class="mb-6 text-lg leading-relaxed text-slate-600">{{ $service->description }}</p>
+                        @if (!empty($features))
+                            <ul class="mb-8 space-y-3">
+                                @foreach ($features as $feature)
+                                    <li class="flex items-center gap-3 text-slate-700">
+                                        <svg class="h-5 w-5 shrink-0 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span class="font-medium">{{ $feature }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                        <a href="{{ route('service.detail', $service->slug) }}" class="inline-flex items-center gap-2 text-sm font-bold text-cyan hover:text-cyan-700 transition-colors">
+                            View Service Details
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                        </a>
                     </div>
                 </div>
-            @endforeach
+            @empty
+                <p class="text-center text-slate-500">No services are currently listed.</p>
+            @endforelse
         </div>
     </section>
 
@@ -110,4 +129,73 @@
             <a href="{{ route('booking', ['type' => 'booking']) }}" class="inline-block rounded-lg bg-white px-8 py-4 text-lg font-extrabold text-cyan shadow-lg transition hover:-translate-y-1 hover:bg-slate-50">{{ $ctaLabel }}</a>
         </div>
     </section>
+
+    <script>
+    (function () {
+        var panels  = document.querySelectorAll('[data-service-panel]');
+        var tabBtns = document.querySelectorAll('[data-tab-btn]');
+        var search  = document.getElementById('sub-service-search');
+
+        var activeId = null;
+
+        function activateTab(id) {
+            activeId = id;
+
+            // Update tab button styles
+            tabBtns.forEach(function (btn) {
+                var isActive = btn.getAttribute('data-tab-btn') === String(id);
+                btn.classList.toggle('text-cyan-500', isActive);
+                btn.classList.toggle('border-b-2', isActive);
+                btn.classList.toggle('border-cyan-500', isActive);
+                btn.classList.toggle('text-slate-600', !isActive);
+            });
+
+            // Show/hide panels
+            panels.forEach(function (panel) {
+                panel.classList.toggle('hidden', panel.getAttribute('data-service-panel') !== String(id));
+            });
+
+            // Reset search
+            if (search) search.value = '';
+            filterCards('');
+        }
+
+        function filterCards(query) {
+            var activePanel = document.querySelector('[data-service-panel="' + activeId + '"]');
+            if (!activePanel) return;
+
+            var cards   = activePanel.querySelectorAll('.sub-service-card');
+            var empty   = activePanel.querySelector('.sub-service-empty');
+            var visible = 0;
+
+            cards.forEach(function (card) {
+                var title   = card.getAttribute('data-title') || '';
+                var matches = !query || title.includes(query.toLowerCase());
+                card.classList.toggle('hidden', !matches);
+                if (matches) visible++;
+            });
+
+            if (empty) empty.classList.toggle('hidden', visible > 0 || cards.length === 0);
+        }
+
+        // Bind tab clicks
+        tabBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                activateTab(btn.getAttribute('data-tab-btn'));
+            });
+        });
+
+        // Bind search
+        if (search) {
+            search.addEventListener('input', function () {
+                filterCards(search.value.trim());
+            });
+        }
+
+        // Activate first tab on load
+        if (tabBtns.length > 0) {
+            activateTab(tabBtns[0].getAttribute('data-tab-btn'));
+        }
+    })();
+    </script>
 @endsection
