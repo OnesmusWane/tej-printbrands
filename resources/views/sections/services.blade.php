@@ -14,7 +14,10 @@
                     <div class="flex flex-1 flex-col p-6 pt-8">
                         <h3 class="mb-3 text-xl font-extrabold text-slate-900 transition group-hover:text-primary">{{ $service['title'] }}</h3>
                         <p class="mb-6 flex-1 text-sm leading-relaxed text-slate-600">{{ $service['description'] }}</p>
-                        <a href="{{ route('booking', ['type' => 'booking', 'service' => $service['title']]) }}" class="rounded-lg border-2 border-primary px-4 py-2.5 text-center text-sm font-bold text-primary transition hover:bg-primary hover:text-white">Book This Service</a>
+                        <a href="{{ route('service.detail', $service['slug']) }}" class="inline-flex items-center justify-center gap-2 rounded-lg border-2 border-primary px-4 py-2.5 text-center text-sm font-bold text-primary transition hover:bg-primary hover:text-white">
+                            View Service Details
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                        </a>
                     </div>
                 </article>
             @endforeach
