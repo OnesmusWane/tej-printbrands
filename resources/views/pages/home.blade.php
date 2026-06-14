@@ -10,7 +10,7 @@
     @include('sections.hero',         ['heroSection' => $sec('hero')])
     @include('sections.services',     ['sectionData' => $sec('services')])
     @include('sections.portfolio',    ['sectionData' => $sec('portfolio')])
+    @include('sections.blog')
     @include('sections.testimonials', ['sectionData' => $sec('testimonials')])
     @include('sections.brands',       ['sectionData' => $sec('brands')])
-    @include('sections.blog')
 @endsection

@@ -17,7 +17,7 @@
                         <div class="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-6 opacity-0 transition duration-300 group-hover:opacity-100">
                             <span class="mb-2 text-sm font-bold text-cyan-300">{{ $item['category'] }}</span>
                             <h3 class="mb-4 text-xl font-extrabold text-white">{{ $item['title'] }}</h3>
-                            <span class="w-max rounded-full border border-white/30 px-4 py-2 text-sm text-white transition group-hover:bg-white group-hover:text-slate-900">View Project</span>
+                            <span class="w-max rounded-full border border-white/30 px-4 py-2 text-sm text-white transition group-hover:bg-white group-hover:text-slate-900">View</span>
                         </div>
                     </article>
                 @endforeach

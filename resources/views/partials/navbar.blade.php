@@ -2,7 +2,6 @@
     $links = [
         ['name' => 'Home',     'route' => 'home'],
         ['name' => 'Services', 'route' => 'services'],
-        ['name' => 'Blog',     'route' => 'blog'],
         ['name' => 'Work',     'route' => 'work'],
         ['name' => 'Shop',     'route' => 'products'],
         ['name' => 'Gallery',  'route' => 'gallery'],

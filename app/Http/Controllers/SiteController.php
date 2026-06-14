@@ -89,9 +89,16 @@ class SiteController extends Controller
         $services = $this->content->services();
         $servicesWithSubs = $services->map(fn($s) => [
             'title'        => $s->title,
-            'sub_services' => collect($s->sub_services ?? [])->map(fn($sub) =>
-                is_string($sub) ? $sub : ($sub['title'] ?? '')
-            )->filter()->values()->all(),
+            'sub_services' => collect($s->sub_services ?? [])->flatMap(function ($sub) {
+                $title = is_string($sub) ? $sub : ($sub['title'] ?? '');
+                $titles = $title ? [$title] : [];
+                // Also include nested sub-service titles so they appear in the dropdown
+                foreach ((is_array($sub) ? ($sub['sub_services'] ?? []) : []) as $ns) {
+                    $nsTitle = is_array($ns) ? ($ns['title'] ?? '') : (string) $ns;
+                    if ($nsTitle) $titles[] = $nsTitle;
+                }
+                return $titles;
+            })->filter()->values()->all(),
         ])->all();
 
         return view('pages.booking', array_merge($this->sharedData(), [

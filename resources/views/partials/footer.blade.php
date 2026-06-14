@@ -1,6 +1,9 @@
 @php
+    $co      = $siteSettings['company']  ?? [];
     $ct      = $siteSettings['contact']  ?? [];
     $socials = $siteSettings['socials']  ?? [];
+    $logoUrl     = $co['logo_url']    ?? null;
+    $companyName = $co['name']        ?? 'Tej Printbrands';
     $address = $ct['address'] ?? null;
     $phone   = $ct['phone']   ?? null;
     $email   = $ct['email']   ?? null;
@@ -27,9 +30,15 @@
     <div class="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
         {{-- Brand + Socials --}}
         <div>
-            <a href="{{ route('home') }}" class="mb-4 flex items-center gap-2">
-                <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan text-xl font-bold text-white">TJ</span>
-                <span class="text-2xl font-bold tracking-tight text-white">Tej <span class="text-cyan">Printbrands</span></span>
+            <a href="{{ route('home') }}" class="mb-4 inline-flex items-center gap-2">
+                @if ($logoUrl)
+                    <span class="flex items-center justify-center rounded-lg bg-white/10 px-3 py-1.5">
+                        <img src="{{ $logoUrl }}" alt="{{ $companyName }}" class="h-8 w-auto object-contain brightness-0 invert">
+                    </span>
+                @else
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan text-xl font-bold text-white">TJ</span>
+                    <span class="text-2xl font-bold tracking-tight text-white">{{ $companyName }}</span>
+                @endif
             </a>
             <p class="mb-5 max-w-xs text-sm leading-relaxed text-gray-400">Premium graphic design, printing, and branding solutions that help your business stand out.</p>
             @php $activeSocials = array_filter($socialLinks, fn($key) => !empty($socials[$key]), ARRAY_FILTER_USE_KEY); @endphp

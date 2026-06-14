@@ -4,6 +4,25 @@ import api from "../api";
 import { useToastStore } from "../stores/toast";
 import ImageUpload from "../components/ImageUpload.vue";
 
+interface NestedSubService {
+    title: string;
+    description?: string;
+    image_url?: string;
+    images?: string[];
+    price_type?: 'fixed' | 'from' | '';
+    price?: number | null;
+}
+
+interface SubService {
+    title: string;
+    description?: string;
+    image_url?: string;
+    images?: string[];
+    price_type?: 'fixed' | 'from' | '';
+    price?: number | null;
+    sub_services?: NestedSubService[];
+}
+
 interface Service {
     id: number;
     slug: string;
@@ -13,7 +32,7 @@ interface Service {
     image_url: string;
     starting_price: string;
     features: string[] | string;
-    sub_services?: { title: string; description?: string; image_url?: string }[];
+    sub_services?: SubService[];
     is_visible: boolean;
     sort_order: number;
 }
@@ -72,19 +91,65 @@ function openNew() {
 
 function addSubService() {
     if (!editing.value.sub_services) editing.value.sub_services = [];
-    editing.value.sub_services.push({ title: '', description: '', image_url: '' });
+    editing.value.sub_services.push({ title: '', description: '', image_url: '', images: [], price_type: '', price: null, sub_services: [] });
 }
 
 function removeSubService(index: number) {
     editing.value.sub_services?.splice(index, 1);
 }
 
-function normalizeSubServices(raw: any[]): { title: string; description: string; image_url: string }[] {
-    return (raw ?? []).map(sub =>
-        typeof sub === 'string'
-            ? { title: sub, description: '', image_url: '' }
-            : { title: sub.title ?? '', description: sub.description ?? '', image_url: sub.image_url ?? '' }
-    );
+function addNestedSubService(parentIdx: number) {
+    const parent = editing.value.sub_services![parentIdx];
+    if (!parent.sub_services) parent.sub_services = [];
+    parent.sub_services.push({ title: '', description: '', image_url: '', images: [], price_type: '', price: null });
+}
+
+function removeNestedSubService(parentIdx: number, nestedIdx: number) {
+    editing.value.sub_services![parentIdx].sub_services?.splice(nestedIdx, 1);
+}
+
+function normalizeSubServices(raw: any[]): SubService[] {
+    return (raw ?? []).map(sub => {
+        if (typeof sub === 'string') return { title: sub, description: '', image_url: '', images: [], price_type: '' as const, price: null, sub_services: [] };
+        // Migrate: seed images[] from image_url if images is missing/empty
+        const imgs: string[] = Array.isArray(sub.images) && sub.images.filter(Boolean).length
+            ? sub.images.filter(Boolean)
+            : (sub.image_url ? [sub.image_url] : []);
+        return {
+            title: sub.title ?? '',
+            description: sub.description ?? '',
+            image_url: imgs[0] ?? '',
+            images: imgs,
+            price_type: (sub.price_type ?? '') as 'fixed' | 'from' | '',
+            price: sub.price != null ? Number(sub.price) : null,
+            sub_services: (sub.sub_services ?? []).map((ns: any) => {
+                const nsImgs: string[] = Array.isArray(ns.images) && ns.images.filter(Boolean).length
+                    ? ns.images.filter(Boolean)
+                    : (ns.image_url ? [ns.image_url] : []);
+                return {
+                    title: ns.title ?? '',
+                    description: ns.description ?? '',
+                    image_url: nsImgs[0] ?? '',
+                    images: nsImgs,
+                    price_type: (ns.price_type ?? '') as 'fixed' | 'from' | '',
+                    price: ns.price != null ? Number(ns.price) : null,
+                };
+            }),
+        };
+    });
+}
+
+function computeStartingPrice(): string {
+    const subs = editing.value.sub_services ?? [];
+    const prices: number[] = [];
+    for (const sub of subs) {
+        if (sub.price != null && Number(sub.price) > 0) prices.push(Number(sub.price));
+        for (const ns of sub.sub_services ?? []) {
+            if (ns.price != null && Number(ns.price) > 0) prices.push(Number(ns.price));
+        }
+    }
+    if (prices.length === 0) return editing.value.starting_price ?? '';
+    return `From KES ${Math.min(...prices).toLocaleString()}`;
 }
 
 function openEdit(s: Service) {
@@ -119,7 +184,8 @@ async function submit() {
                       .filter(Boolean)
                 : (editing.value.features ?? []);
         const rawSubs = (editing.value.sub_services ?? []).map(s => toRaw(s));
-        const payload = { ...editing.value, features: featuresArr, sub_services: rawSubs };
+        const autoPrice = computeStartingPrice();
+        const payload = { ...editing.value, features: featuresArr, sub_services: rawSubs, starting_price: autoPrice };
         if (editing.value.id) {
             await api.patch(`/services/${editing.value.id}`, payload as any);
             toast.add("Service updated.");
@@ -386,32 +452,13 @@ onMounted(load);
                             @submit.prevent="submit"
                             class="px-6 py-5 space-y-4"
                         >
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label
-                                        class="block text-xs font-semibold text-gray-600 mb-1.5"
-                                        >Title
-                                        <span class="text-red-400"
-                                            >*</span
-                                        ></label
-                                    >
-                                    <input
-                                        v-model="editing.title"
-                                        required
-                                        class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label
-                                        class="block text-xs font-semibold text-gray-600 mb-1.5"
-                                        >Starting Price</label
-                                    >
-                                    <input
-                                        v-model="editing.starting_price"
-                                        placeholder="KES 5,000"
-                                        class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                                    />
-                                </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Title <span class="text-red-400">*</span></label>
+                                <input
+                                    v-model="editing.title"
+                                    required
+                                    class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
+                                />
                             </div>
                             <div>
                                 <label
@@ -461,7 +508,7 @@ onMounted(load);
                                     placeholder="Feature one&#10;Feature two&#10;Feature three"
                                 ></textarea>
                             </div>
-                            {{-- Sub-services --}}
+                            <!-- Sub-services -->
                             <div class="border border-gray-200 rounded-xl p-4 space-y-4">
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-semibold text-gray-600">Sub-services</label>
@@ -472,19 +519,118 @@ onMounted(load);
                                 </div>
                                 <div v-if="!editing.sub_services?.length" class="text-xs text-gray-400 text-center py-2">No sub-services yet — click Add Sub-service.</div>
                                 <div v-for="(sub, idx) in editing.sub_services" :key="idx" class="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
+                                    <!-- Title + delete -->
                                     <div class="flex items-center gap-2">
                                         <input v-model="sub.title" placeholder="Title *" required class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20" />
                                         <button type="button" @click="removeSubService(idx)" class="text-red-400 hover:text-red-600 p-1 shrink-0">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                         </button>
                                     </div>
+                                    <!-- Description -->
                                     <input v-model="sub.description" placeholder="Short description (optional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20" />
-                                    <ImageUpload
-                                        :modelValue="editing.sub_services![idx].image_url ?? ''"
-                                        @update:modelValue="(url: string) => { if (editing.sub_services) editing.sub_services[idx].image_url = url }"
-                                        label="Image (optional)"
-                                        height="h-28"
-                                    />
+                                    <!-- Price type + amount -->
+                                    <div class="flex gap-2">
+                                        <select v-model="sub.price_type" class="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-36">
+                                            <option value="">No price</option>
+                                            <option value="fixed">Fixed (KES X)</option>
+                                            <option value="from">From (From KES X)</option>
+                                        </select>
+                                        <input
+                                            v-if="sub.price_type"
+                                            v-model.number="sub.price"
+                                            type="number"
+                                            min="0"
+                                            placeholder="e.g. 5000"
+                                            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
+                                        />
+                                    </div>
+                                    <!-- Images (multiple) -->
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-medium text-gray-500">Images</span>
+                                            <button type="button"
+                                                    @click="() => { if (!sub.images) sub.images = []; sub.images.push('') }"
+                                                    class="inline-flex items-center gap-1 text-xs font-semibold text-cyan-600 hover:text-cyan-700">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                                Add Image
+                                            </button>
+                                        </div>
+                                        <p v-if="!sub.images?.length" class="text-[11px] text-gray-400 text-center py-2 border border-dashed border-gray-200 rounded-lg">No images yet.</p>
+                                        <div v-for="(_, imgIdx) in sub.images" :key="imgIdx" class="relative">
+                                            <ImageUpload
+                                                :modelValue="sub.images![imgIdx]"
+                                                @update:modelValue="(url: string) => { if (sub.images) sub.images[imgIdx] = url }"
+                                                :label="imgIdx === 0 ? 'Cover image' : `Image ${imgIdx + 1}`"
+                                                height="h-24"
+                                            />
+                                            <button type="button"
+                                                    @click="sub.images?.splice(imgIdx, 1)"
+                                                    class="absolute top-2 right-2 z-10 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-sm leading-none shadow-md">
+                                                &times;
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <!-- Nested sub-services -->
+                                    <div class="border border-gray-200 rounded-lg bg-white p-2 space-y-2">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-[11px] font-semibold text-gray-500">Nested Sub-services</span>
+                                            <button type="button" @click="addNestedSubService(idx)" class="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-600 hover:text-cyan-700">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                                Add Nested
+                                            </button>
+                                        </div>
+                                        <div v-if="!sub.sub_services?.length" class="text-[11px] text-gray-400 text-center py-1">None yet.</div>
+                                        <div v-for="(ns, nIdx) in sub.sub_services" :key="nIdx" class="rounded border border-gray-100 bg-gray-50 p-2 space-y-1.5">
+                                            <div class="flex items-center gap-2">
+                                                <input v-model="ns.title" placeholder="Nested title *" class="flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20" />
+                                                <button type="button" @click="removeNestedSubService(idx, nIdx)" class="text-red-400 hover:text-red-600 p-0.5 shrink-0">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                </button>
+                                            </div>
+                                            <input v-model="ns.description" placeholder="Description (optional)" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20" />
+                                            <div class="flex gap-2">
+                                                <select v-model="ns.price_type" class="border border-gray-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 w-32">
+                                                    <option value="">No price</option>
+                                                    <option value="fixed">Fixed</option>
+                                                    <option value="from">From</option>
+                                                </select>
+                                                <input
+                                                    v-if="ns.price_type"
+                                                    v-model.number="ns.price"
+                                                    type="number"
+                                                    min="0"
+                                                    placeholder="e.g. 2000"
+                                                    class="flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500"
+                                                />
+                                            </div>
+                                            <!-- Nested images (multiple) -->
+                                            <div class="space-y-1.5">
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-[10px] font-medium text-gray-400">Images</span>
+                                                    <button type="button"
+                                                            @click="() => { if (!ns.images) ns.images = []; ns.images.push('') }"
+                                                            class="inline-flex items-center gap-0.5 text-[10px] font-semibold text-cyan-600 hover:text-cyan-700">
+                                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                                        Add
+                                                    </button>
+                                                </div>
+                                                <p v-if="!ns.images?.length" class="text-[10px] text-gray-400 text-center py-1 border border-dashed border-gray-200 rounded">No images.</p>
+                                                <div v-for="(_, nsImgIdx) in ns.images" :key="nsImgIdx" class="relative">
+                                                    <ImageUpload
+                                                        :modelValue="ns.images![nsImgIdx]"
+                                                        @update:modelValue="(url: string) => { if (ns.images) ns.images[nsImgIdx] = url }"
+                                                        :label="nsImgIdx === 0 ? 'Cover' : `Img ${nsImgIdx + 1}`"
+                                                        height="h-16"
+                                                    />
+                                                    <button type="button"
+                                                            @click="ns.images?.splice(nsImgIdx, 1)"
+                                                            class="absolute top-1.5 right-1.5 z-10 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs leading-none shadow">
+                                                        &times;
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
