@@ -10,9 +10,12 @@ interface Project {
     category: string;
     client: string;
     image_url: string;
+    gallery: string[];
     description: string;
     project_date: string;
+    services: string[];
     is_featured: boolean;
+    is_case_study: boolean;
     is_visible: boolean;
 }
 
@@ -21,7 +24,7 @@ const items = ref<Project[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const showModal = ref(false);
-const editing = ref<Partial<Project>>({});
+const editing = ref<Partial<Project> & { gallery: string[] }>({ gallery: [] });
 const searchQuery = ref("");
 
 const categories = [
@@ -61,28 +64,47 @@ async function load() {
 function openNew() {
     editing.value = {
         is_featured: false,
+        is_case_study: false,
         is_visible: true,
         category: categories[0],
+        gallery: [],
+        services: [],
     };
     showModal.value = true;
 }
 
 function openEdit(p: Project) {
-    editing.value = { ...p };
+    editing.value = {
+        ...p,
+        gallery: Array.isArray(p.gallery) ? p.gallery.filter(Boolean) : [],
+        services: Array.isArray(p.services) ? p.services : [],
+    };
     showModal.value = true;
+}
+
+function addGallerySlot() {
+    editing.value.gallery.push('');
+}
+
+function removeGallery(idx: number) {
+    editing.value.gallery.splice(idx, 1);
 }
 
 async function submit() {
     saving.value = true;
     try {
+        const payload = {
+            ...editing.value,
+            gallery: editing.value.gallery.filter(Boolean),
+            services: typeof editing.value.services === 'string'
+                ? (editing.value.services as any as string).split('\n').map((s: string) => s.trim()).filter(Boolean)
+                : (editing.value.services ?? []),
+        };
         if (editing.value.id) {
-            await api.patch(
-                `/portfolio-projects/${editing.value.id}`,
-                editing.value as any,
-            );
+            await api.patch(`/portfolio-projects/${editing.value.id}`, payload as any);
             toast.add("Project updated.");
         } else {
-            await api.post("/portfolio-projects", editing.value as any);
+            await api.post("/portfolio-projects", payload as any);
             toast.add("Project created.");
         }
         showModal.value = false;
@@ -191,6 +213,15 @@ onMounted(load);
                                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                             />
                         </svg>
+                    </div>
+                    <!-- Gallery count badge -->
+                    <div v-if="(project.gallery?.filter(Boolean).length ?? 0) > 0"
+                         class="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        {{ project.gallery.filter(Boolean).length }}
                     </div>
 
                     <!-- Hover overlay with actions -->
@@ -364,48 +395,97 @@ onMounted(load);
                                     />
                                 </div>
                             </div>
+                            <!-- Cover image -->
                             <ImageUpload
                                 v-model="editing.image_url"
-                                label="Project Image"
-                                height="h-44"
+                                label="Cover Image"
+                                height="h-40"
                             />
+
+                            <!-- Gallery images -->
                             <div>
-                                <label
-                                    class="block text-xs font-semibold text-gray-600 mb-1.5"
-                                    >Description</label
-                                >
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-xs font-semibold text-gray-600">
+                                        Project Gallery
+                                        <span class="ml-1 text-gray-400 font-normal">(shown in modal)</span>
+                                    </label>
+                                    <button type="button" @click="addGallerySlot"
+                                            class="text-xs font-medium flex items-center gap-1 text-cyan-500 hover:text-cyan-600">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                        Add Image
+                                    </button>
+                                </div>
+
+                                <div v-if="editing.gallery.length === 0"
+                                     class="rounded-xl border-2 border-dashed border-gray-200 py-6 text-center">
+                                    <svg class="w-7 h-7 text-gray-300 mx-auto mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <p class="text-xs text-gray-400">No gallery images yet.</p>
+                                    <button type="button" @click="addGallerySlot"
+                                            class="mt-1.5 text-xs font-medium text-cyan-500 hover:text-cyan-600">
+                                        + Add first image
+                                    </button>
+                                </div>
+
+                                <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    <div v-for="(img, idx) in editing.gallery" :key="idx" class="relative">
+                                        <div class="absolute -top-1.5 left-1 z-10">
+                                            <span class="rounded-full bg-white border border-gray-200 px-1.5 py-0.5 text-[9px] font-bold text-gray-500 leading-none shadow-sm">
+                                                #{{ idx + 1 }}
+                                            </span>
+                                        </div>
+                                        <ImageUpload
+                                            :modelValue="img"
+                                            @update:modelValue="editing.gallery[idx] = $event"
+                                            height="h-24"
+                                        />
+                                        <button type="button" @click="removeGallery(idx)"
+                                                class="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 leading-none">
+                                            ×
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Description</label>
                                 <textarea
                                     v-model="editing.description"
                                     rows="3"
                                     class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-none"
                                 ></textarea>
                             </div>
-                            <div class="flex items-center gap-6">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">
+                                    Services Provided
+                                    <span class="font-normal text-gray-400 ml-1">(one per line)</span>
+                                </label>
+                                <textarea
+                                    :value="Array.isArray(editing.services) ? editing.services.join('\n') : editing.services"
+                                    @input="e => editing.services = (e.target as HTMLTextAreaElement).value as any"
+                                    rows="3"
+                                    placeholder="e.g. Logo Design&#10;Business Cards&#10;Signage"
+                                    class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-none"
+                                ></textarea>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-6">
                                 <div class="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        id="proj-featured"
-                                        v-model="editing.is_featured"
-                                        class="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"
-                                    />
-                                    <label
-                                        for="proj-featured"
-                                        class="text-sm text-gray-700"
-                                        >Featured</label
-                                    >
+                                    <input type="checkbox" id="proj-featured" v-model="editing.is_featured"
+                                           class="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"/>
+                                    <label for="proj-featured" class="text-sm text-gray-700">Featured</label>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        id="proj-visible"
-                                        v-model="editing.is_visible"
-                                        class="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"
-                                    />
-                                    <label
-                                        for="proj-visible"
-                                        class="text-sm text-gray-700"
-                                        >Visible</label
-                                    >
+                                    <input type="checkbox" id="proj-case" v-model="editing.is_case_study"
+                                           class="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"/>
+                                    <label for="proj-case" class="text-sm text-gray-700">Case Study</label>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" id="proj-visible" v-model="editing.is_visible"
+                                           class="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"/>
+                                    <label for="proj-visible" class="text-sm text-gray-700">Visible</label>
                                 </div>
                             </div>
                             <div
