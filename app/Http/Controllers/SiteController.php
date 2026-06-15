@@ -180,11 +180,11 @@ class SiteController extends Controller
 
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:1000'],
-            'finish' => ['required', 'string', 'max:120'],
+            'finish' => ['nullable', 'string', 'max:120'],
         ]);
 
         $cart = session('cart', []);
-        $key = $slug.'|'.$validated['finish'];
+        $key = $slug.'|'.($validated['finish'] ?? 'standard');
 
         $cart[$key] = [
             'slug' => $slug,
@@ -291,6 +291,17 @@ class SiteController extends Controller
         ]);
 
         session()->forget('cart');
+
+        // Reduce stock for tracked products
+        $slugs = collect($this->cartItems())->pluck('product.slug')->filter()->unique()->all();
+        if (!empty($slugs)) {
+            $cartMap = collect($order->items)->keyBy('key');
+            Product::whereIn('slug', $slugs)->whereNotNull('stock_quantity')->get()
+                ->each(function (Product $p) use ($cartMap) {
+                    $qty = (int) ($cartMap->get($p->slug)['quantity'] ?? 0);
+                    if ($qty > 0) $p->reduceStock($qty);
+                });
+        }
 
         if ($order->payment_method === 'mpesa') {
             return redirect()->route('account.orders.mpesa', $order);

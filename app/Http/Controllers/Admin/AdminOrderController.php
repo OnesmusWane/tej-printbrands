@@ -40,15 +40,24 @@ class AdminOrderController extends Controller
             );
         }
 
-        // Build items array
+        // Build items array — validate stock first
         $items    = [];
         $subtotal = 0;
+        $products = [];
         foreach ($data['items'] as $item) {
             $product   = Product::findOrFail($item['product_id']);
+            $qty       = (int) $item['quantity'];
+
+            if ($product->stock_quantity !== null && $product->stock_quantity < $qty) {
+                return response()->json([
+                    'message' => "Insufficient stock for \"{$product->name}\". Available: {$product->stock_quantity}.",
+                ], 422);
+            }
+
             $unitPrice = isset($item['unit_price']) && $item['unit_price'] > 0
                 ? (float) $item['unit_price']
                 : (float) $product->price;
-            $lineTotal = $unitPrice * (int) $item['quantity'];
+            $lineTotal = $unitPrice * $qty;
             $subtotal += $lineTotal;
 
             $items[] = [
@@ -61,11 +70,12 @@ class AdminOrderController extends Controller
                     'image'    => $product->image_url ?? '',
                     'unit'     => $product->unit ?? '',
                 ],
-                'quantity'   => (int) $item['quantity'],
+                'quantity'   => $qty,
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
                 'note'       => $item['note'] ?? null,
             ];
+            $products[] = ['model' => $product, 'qty' => $qty];
         }
 
         $serviceFee   = (int) ($data['service_fee'] ?? 0);
@@ -86,13 +96,18 @@ class AdminOrderController extends Controller
             'notes'            => $data['notes'] ?? null,
         ]);
 
+        // Reduce stock after order is persisted
+        foreach ($products as ['model' => $product, 'qty' => $qty]) {
+            $product->reduceStock($qty);
+        }
+
         return response()->json($order->load('user'), 201);
     }
 
     public function products(): JsonResponse
     {
         return response()->json(
-            Product::where('is_visible', true)->orderBy('name')->get(['id', 'name', 'price', 'unit', 'slug'])
+            Product::where('is_visible', true)->orderBy('name')->get(['id', 'name', 'price', 'unit', 'slug', 'stock_quantity'])
         );
     }
 

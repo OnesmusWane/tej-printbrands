@@ -8,6 +8,7 @@ return [
         'quotations.view' => 'View Quotations','quotations.edit' => 'Manage Quotations',
         'invoices.view' => 'View Invoices',    'invoices.edit' => 'Manage Invoices',
         'payments.view' => 'View Payments',    'payments.edit' => 'Manage Payments',
+        'orders.view'   => 'View Orders',      'orders.edit'   => 'Manage Orders',
     ],
     'Content'   => [
         'content.view' => 'View Content',      'content.edit' => 'Manage Content',
