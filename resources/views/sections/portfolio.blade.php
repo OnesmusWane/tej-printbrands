@@ -1,7 +1,23 @@
-@php($categories = collect($portfolioItems)->pluck('category')->unique()->prepend('All')->values())
+@php
+    $sectionData = $sectionData ?? null;
+    $categories  = collect($portfolioItems)->pluck('category')->unique()->prepend('All')->values();
+    $portWords   = explode(' ', $sectionData?->heading ?? 'Our Work');
+    $portHalf    = (int) ceil(count($portWords) / 2);
+    $portFirst   = implode(' ', array_slice($portWords, 0, $portHalf));
+    $portSecond  = implode(' ', array_slice($portWords, $portHalf));
+    $portDesc    = $sectionData?->subtext ?? 'A showcase of our recent projects.';
+@endphp
 <section id="work" class="relative overflow-hidden bg-white py-24">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        @include('partials.section-heading', ['kicker' => '', 'title' => $sectionData?->heading ?? 'Our Work', 'description' => $sectionData?->subtext ?? 'A showcase of our recent projects.'])
+        <div class="mb-16 text-center">
+            <h2 class="relative mb-4 inline-block text-3xl font-extrabold text-slate-900 md:text-4xl">
+                {{ $portFirst }} <span class="text-primary">{{ $portSecond }}</span>
+                <span class="absolute -bottom-3 left-1/4 right-1/4 h-1 rounded-full bg-primary"></span>
+            </h2>
+            @if (!empty($portDesc))
+                <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">{{ $portDesc }}</p>
+            @endif
+        </div>
 
         <div data-portfolio class="mt-12">
             <div class="mb-12 flex flex-wrap justify-center gap-2 md:gap-4">

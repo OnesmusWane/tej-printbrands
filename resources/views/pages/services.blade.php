@@ -6,12 +6,20 @@
     @php
         $servicesPage = $pagesBySlug['services'] ?? null;
         $heroSec      = $servicesPage?->sections->firstWhere('key', 'hero');
+        $processSec   = $servicesPage?->sections->firstWhere('key', 'process');
+        $pricingSec   = $servicesPage?->sections->firstWhere('key', 'pricing');
         $ctaLabel     = $heroSec?->settings['cta'] ?? 'Contact Us Today';
     @endphp
     <section class="relative overflow-hidden bg-gradient-to-br from-cyan-900 via-slate-800 to-slate-900 pt-36 pb-24 text-center">
         <div class="absolute inset-0 opacity-10 [background-image:linear-gradient(rgba(255,255,255,.8)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.8)_1px,transparent_1px)] [background-size:40px_40px]"></div>
         <div class="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h1 class="mb-6 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">{{ $heroSec?->heading ?? 'Our Premium' }} <span class="text-cyan-400">Services</span></h1>
+            @php
+                $headingWords = explode(' ', $heroSec?->heading ?? 'Our Premium Services');
+                $half = (int) ceil(count($headingWords) / 2);
+                $headingFirst = implode(' ', array_slice($headingWords, 0, $half));
+                $headingSecond = implode(' ', array_slice($headingWords, $half));
+            @endphp
+            <h1 class="mb-6 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">{{ $headingFirst }} <span class="text-cyan-400">{{ $headingSecond }}</span></h1>
             <p class="mx-auto max-w-2xl text-xl text-cyan-50">{{ $heroSec?->subtext ?? 'Comprehensive design, printing, and branding solutions tailored to elevate your business.' }}</p>
         </div>
     </section>
@@ -63,7 +71,18 @@
 
     <section class="bg-light py-24">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            @include('partials.section-heading', ['kicker' => 'Our', 'title' => 'Process'])
+            @php
+                $processWords  = explode(' ', $processSec?->heading ?? 'Our Process');
+                $processHalf   = (int) ceil(count($processWords) / 2);
+                $processFirst  = implode(' ', array_slice($processWords, 0, $processHalf));
+                $processSecond = implode(' ', array_slice($processWords, $processHalf));
+            @endphp
+            <div class="mb-16 text-center">
+                <h2 class="relative mb-4 inline-block text-3xl font-extrabold text-slate-900 md:text-4xl">
+                    {{ $processFirst }} <span class="text-primary">{{ $processSecond }}</span>
+                    <span class="absolute -bottom-3 left-1/4 right-1/4 h-1 rounded-full bg-primary"></span>
+                </h2>
+            </div>
             <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
                 @foreach ($processSteps as $step)
                     <article class="relative rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm transition hover:shadow-md">
@@ -78,7 +97,22 @@
 
     <section class="bg-white py-24">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            @include('partials.section-heading', ['kicker' => 'Pricing', 'title' => 'Packages', 'description' => 'Transparent pricing tailored to businesses of all sizes.'])
+            @php
+                $pricingWords  = explode(' ', $pricingSec?->heading ?? 'Pricing Packages');
+                $pricingHalf   = (int) ceil(count($pricingWords) / 2);
+                $pricingFirst  = implode(' ', array_slice($pricingWords, 0, $pricingHalf));
+                $pricingSecond = implode(' ', array_slice($pricingWords, $pricingHalf));
+                $pricingDesc   = $pricingSec?->subtext ?? 'Transparent pricing tailored to businesses of all sizes.';
+            @endphp
+            <div class="mb-16 text-center">
+                <h2 class="relative mb-4 inline-block text-3xl font-extrabold text-slate-900 md:text-4xl">
+                    {{ $pricingFirst }} <span class="text-primary">{{ $pricingSecond }}</span>
+                    <span class="absolute -bottom-3 left-1/4 right-1/4 h-1 rounded-full bg-primary"></span>
+                </h2>
+                @if (!empty($pricingDesc))
+                    <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">{{ $pricingDesc }}</p>
+                @endif
+            </div>
             @php
                 // Always render the most-popular tier in the centre slot
                 $tiersOrdered = collect($pricingTiers);

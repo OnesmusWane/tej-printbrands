@@ -114,6 +114,7 @@ class ReferenceContentSeeder extends Seeder
                 ['services',     ['heading' => 'Our Services',         'subtext' => 'From concept to completion, we deliver excellence across all our creative services.']],
                 ['portfolio',    ['heading' => 'Our Work',             'subtext' => 'A showcase of our recent projects. We take pride in delivering exceptional quality across all our services.']],
                 ['testimonials', ['heading' => 'Client Testimonials',  'subtext' => null]],
+                ['blog',         ['heading' => 'From Our Blog',          'subtext' => 'Tips, insights and updates from the Tej Printbrands team.']],
                 ['brands',       ['heading' => "Brands We've Worked With", 'subtext' => null]],
             ],
             'services' => [
@@ -131,6 +132,18 @@ class ReferenceContentSeeder extends Seeder
                     'subtext'  => 'Explore our portfolio of successful projects, from stunning brand identities to large-scale environmental graphics.',
                 ]],
                 ['case-studies', ['heading' => 'Featured Case Studies', 'subtext' => null]],
+                ['portfolio',    ['heading' => 'Our Work',              'subtext' => 'A showcase of our recent projects. We take pride in delivering exceptional quality across all our services.']],
+            ],
+            'shop' => [
+                ['hero', [
+                    'heading' => 'Premium Print Products',
+                    'subtext'  => 'Select a polished package, customize the finish, and checkout with M-Pesa, bank transfer, or card-style payment intake.',
+                ]],
+                ['products', [
+                    'heading' => 'Curated Premium Packages',
+                    'subtext'  => 'Designed for businesses that want print work to feel intentional, tactile, and boardroom-ready.',
+                    'settings' => ['quote_label' => 'Need a custom quote?'],
+                ]],
             ],
             'gallery' => [
                 ['hero', [
@@ -139,12 +152,10 @@ class ReferenceContentSeeder extends Seeder
                 ]],
             ],
             'contact' => [
-                ['hero', [
-                    'heading' => 'Get in Touch',
-                    'subtext'  => "We're here to help bring your ideas to life. Reach out to us for quotes, consultations, or general inquiries.",
-                ]],
-                ['faqs',    ['heading' => 'Frequently Asked Questions', 'subtext' => null]],
-                ['form',    ['heading' => 'Send a Message', 'subtext' => null]],
+                ['hero',         ['heading' => 'Get in Touch',                   'subtext' => "We're here to help bring your ideas to life. Reach out to us for quotes, consultations, or general inquiries."]],
+                ['contact-info', ['heading' => 'Contact Information',            'subtext' => null]],
+                ['faqs',         ['heading' => 'Frequently Asked Questions',     'subtext' => null]],
+                ['form',         ['heading' => 'Send a Message',                 'subtext' => null]],
             ],
         ];
 

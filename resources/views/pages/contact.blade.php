@@ -4,8 +4,11 @@
 
 @section('content')
     @php
-        $contactPage = $pagesBySlug['contact'] ?? null;
-        $heroSec     = $contactPage?->sections->firstWhere('key', 'hero');
+        $contactPage    = $pagesBySlug['contact'] ?? null;
+        $heroSec        = $contactPage?->sections->firstWhere('key', 'hero');
+        $contactInfoSec = $contactPage?->sections->firstWhere('key', 'contact-info');
+        $faqsSec        = $contactPage?->sections->firstWhere('key', 'faqs');
+        $formSec        = $contactPage?->sections->firstWhere('key', 'form');
         $ct          = $siteSettings['contact'] ?? [];
         $address     = $ct['address']  ?? 'Nairobi, Kenya';
         $phone       = $ct['phone']    ?? '+254 700 000 000';
@@ -24,7 +27,7 @@
         <div class="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20 lg:px-8">
             <div class="space-y-12">
                 <div>
-                    <h2 class="mb-8 text-3xl font-extrabold text-slate-900">Contact Information</h2>
+                    <h2 class="mb-8 text-3xl font-extrabold text-slate-900">{{ $contactInfoSec?->heading ?? 'Contact Information' }}</h2>
                     <div class="space-y-6">
                         <div class="flex items-start gap-4"><div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan">@include('components.icon', ['name' => 'map-pin', 'class' => 'w-6 h-6'])</div><div><h3 class="text-lg font-extrabold text-dark">Visit Our Studio</h3><p class="mt-1 text-slate-600">{{ $address }}</p></div></div>
                         <div class="flex items-start gap-4"><div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan">@include('components.icon', ['name' => 'phone', 'class' => 'w-6 h-6'])</div><div><h3 class="text-lg font-extrabold text-dark">Call Us</h3><p class="mt-1 text-slate-600">{{ $phone }}<br>{{ $hours }}</p></div></div>
@@ -32,7 +35,7 @@
                     </div>
                 </div>
                 <div>
-                    <h2 class="mb-6 text-2xl font-extrabold text-slate-900">Frequently Asked Questions</h2>
+                    <h2 class="mb-6 text-2xl font-extrabold text-slate-900">{{ $faqsSec?->heading ?? 'Frequently Asked Questions' }}</h2>
                     <div class="space-y-4">
                         @forelse ($faqs as $faq)
                             <details class="group overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
@@ -45,7 +48,7 @@
                 </div>
             </div>
             <div class="rounded-2xl border border-slate-100 bg-white p-8 shadow-xl md:p-10">
-                <h2 class="mb-6 text-2xl font-extrabold text-slate-900">Send a Message</h2>
+                <h2 class="mb-6 text-2xl font-extrabold text-slate-900">{{ $formSec?->heading ?? 'Send a Message' }}</h2>
                 <form class="space-y-6" method="post" action="#">
                     @csrf
                     <div class="grid gap-6 md:grid-cols-2"><label class="space-y-2 text-sm font-medium text-slate-700">First Name<input type="text" class="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="John"></label><label class="space-y-2 text-sm font-medium text-slate-700">Last Name<input type="text" class="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Doe"></label></div>

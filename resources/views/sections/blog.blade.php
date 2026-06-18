@@ -1,7 +1,23 @@
 @if ($recentBlogPosts->isNotEmpty())
 <section class="bg-light py-20">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        @include('partials.section-heading', ['kicker' => 'From Our', 'title' => 'Blog', 'description' => 'Tips, insights and updates from the Tej Printbrands team.'])
+        @php
+            $sectionData = $sectionData ?? null;
+            $blogWords   = explode(' ', $sectionData?->heading ?? 'From Our Blog');
+            $blogHalf    = (int) ceil(count($blogWords) / 2);
+            $blogFirst   = implode(' ', array_slice($blogWords, 0, $blogHalf));
+            $blogSecond  = implode(' ', array_slice($blogWords, $blogHalf));
+            $blogDesc    = $sectionData?->subtext ?? 'Tips, insights and updates from the Tej Printbrands team.';
+        @endphp
+        <div class="mb-16 text-center">
+            <h2 class="relative mb-4 inline-block text-3xl font-extrabold text-slate-900 md:text-4xl">
+                {{ $blogFirst }} <span class="text-primary">{{ $blogSecond }}</span>
+                <span class="absolute -bottom-3 left-1/4 right-1/4 h-1 rounded-full bg-primary"></span>
+            </h2>
+            @if (!empty($blogDesc))
+                <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">{{ $blogDesc }}</p>
+            @endif
+        </div>
         <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             @foreach ($recentBlogPosts as $post)
                 <article class="group rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">

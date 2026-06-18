@@ -54,6 +54,7 @@ const SETTING_LABELS: Record<string, string> = {
     cta_url:       'Button URL',
     button_label:  'Button Label',
     button_url:    'Button URL',
+    quote_label:   'Quote Button Label',
 }
 
 function settingLabel(key: string): string {

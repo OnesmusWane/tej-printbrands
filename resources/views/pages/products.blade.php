@@ -3,14 +3,32 @@
 @section('title', 'Premium Products | Tej Printbrands')
 
 @section('content')
+    @php
+        $shopPage    = $pagesBySlug['shop'] ?? null;
+        $heroSec     = $shopPage?->sections->firstWhere('key', 'hero');
+        $productsSec = $shopPage?->sections->firstWhere('key', 'products');
+
+        $heroWords   = explode(' ', $heroSec?->heading ?? 'Premium Print Products');
+        $heroHalf    = (int) ceil(count($heroWords) / 2);
+        $heroFirst   = implode(' ', array_slice($heroWords, 0, $heroHalf));
+        $heroSecond  = implode(' ', array_slice($heroWords, $heroHalf));
+
+        $prodWords   = explode(' ', $productsSec?->heading ?? 'Curated Premium Packages');
+        $prodHalf    = (int) ceil(count($prodWords) / 2);
+        $prodFirst   = implode(' ', array_slice($prodWords, 0, $prodHalf));
+        $prodSecond  = implode(' ', array_slice($prodWords, $prodHalf));
+
+        $quoteLabel  = $productsSec?->settings['quote_label'] ?? 'Need a custom quote?';
+    @endphp
+
     <section class="relative overflow-hidden bg-slate-950 pt-36 pb-24">
-        <img src="{{ asset('assets/images/printing.jpg') }}" alt="Premium print products" class="absolute inset-0 h-full w-full object-cover opacity-30">
+        <img src="{{ $heroSec?->image_url ?? asset('assets/images/printing.jpg') }}" alt="Premium print products" class="absolute inset-0 h-full w-full object-cover opacity-30">
         <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900/95 to-slate-900/70"></div>
         <div class="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl">
                 <p class="mb-4 text-sm font-extrabold uppercase tracking-[0.25em] text-primary">Premium Shop</p>
-                <h1 class="mb-6 text-4xl font-extrabold text-white md:text-6xl">Premium print products with a guided purchase flow.</h1>
-                <p class="text-lg leading-relaxed text-slate-300">Select a polished package, customize the finish, and checkout with M-Pesa, bank transfer, or card-style payment intake.</p>
+                <h1 class="mb-6 text-4xl font-extrabold text-white md:text-6xl">{{ $heroFirst }} <span class="text-primary">{{ $heroSecond }}</span></h1>
+                <p class="text-lg leading-relaxed text-slate-300">{{ $heroSec?->subtext ?? 'Select a polished package, customize the finish, and checkout with M-Pesa, bank transfer, or card-style payment intake.' }}</p>
             </div>
         </div>
     </section>
@@ -19,10 +37,10 @@
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <h2 class="text-3xl font-extrabold text-slate-900 md:text-4xl">Curated Premium Packages</h2>
-                    <p class="mt-3 max-w-2xl text-slate-600">Designed for businesses that want print work to feel intentional, tactile, and boardroom-ready.</p>
+                    <h2 class="text-3xl font-extrabold text-slate-900 md:text-4xl">{{ $prodFirst }} <span class="text-primary">{{ $prodSecond }}</span></h2>
+                    <p class="mt-3 max-w-2xl text-slate-600">{{ $productsSec?->subtext ?? 'Designed for businesses that want print work to feel intentional, tactile, and boardroom-ready.' }}</p>
                 </div>
-                <a href="{{ route('booking', ['type' => 'quote']) }}" class="w-max rounded-lg border border-primary px-5 py-3 font-extrabold text-primary transition hover:bg-primary hover:text-white">Need a custom quote?</a>
+                <a href="{{ route('booking', ['type' => 'quote']) }}" class="w-max rounded-lg border border-primary px-5 py-3 font-extrabold text-primary transition hover:bg-primary hover:text-white">{{ $quoteLabel }}</a>
             </div>
 
             @if (session('cart_success'))
