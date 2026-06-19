@@ -32,9 +32,7 @@
         <div>
             <a href="{{ route('home') }}" class="mb-4 inline-flex items-center gap-2">
                 @if ($logoUrl)
-                    <span class="flex items-center justify-center rounded-lg bg-white/10 px-3 py-1.5">
-                        <img src="{{ $logoUrl }}" alt="{{ $companyName }}" class="h-8 w-auto object-contain brightness-0 invert">
-                    </span>
+                    <img src="{{ $logoUrl }}" alt="{{ $companyName }}" class="h-10 w-auto object-contain">
                 @else
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan text-xl font-bold text-white">TJ</span>
                     <span class="text-2xl font-bold tracking-tight text-white">{{ $companyName }}</span>
