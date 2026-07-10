@@ -19,9 +19,9 @@
             <h1 class="mb-6 text-4xl font-extrabold leading-[1.03] text-white md:text-5xl lg:text-6xl">{{ $heading }}</h1>
             <p class="mb-9 max-w-xl text-lg leading-relaxed text-cyan-50/80 md:text-xl">{{ $subtext }}</p>
             <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap"> 
-                <a href="{{ route("booking", ["type" => "quote"]) }}" class="rounded-lg bg-red px-8 py-4 text-center font-bold text-white shadow-lg shadow-red/30 transition hover:-translate-y-1 hover:bg-red-600">{{ $ctaPrimary }}</a>
-                <a href="{{ route("booking", ["type" => "booking"]) }}" class="rounded-lg bg-cyan px-8 py-4 text-center font-bold text-white shadow-lg shadow-cyan/30 transition hover:-translate-y-1 hover:bg-cyan-600">{{ $ctaSecondary }}</a>
-                <a href="{{ route("work") }}" class="rounded-lg border-2 border-white/20 bg-transparent px-8 py-4 text-center font-bold text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white/10">{{ $ctaTertiary }}</a>
+                <a href="{{ route("booking", ["type" => "quote"]) }}" class="rounded-lg bg-red px-8 py-4 text-center font-bold text-white shadow-lg shadow-red/30 transition hover:-translate-y-1 hover:bg-red-600">{{ 'Request a Quote'}}</a>
+                <a href="{{ route("booking", ["type" => "booking"]) }}" class="rounded-lg bg-cyan px-8 py-4 text-center font-bold text-white shadow-lg shadow-cyan/30 transition hover:-translate-y-1 hover:bg-cyan-600">{{ 'Book a Service' }}</a>
+                <a href="{{ route("work") }}" class="rounded-lg border-2 border-white/20 bg-transparent px-8 py-4 text-center font-bold text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white/10">{{ 'View Our Work' }}</a>
             </div>
         </div>
     </div>
