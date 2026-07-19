@@ -22,7 +22,7 @@
                 <a href="{{ route('service.detail', $service['slug']) }}"
                    class="group flex flex-col overflow-hidden rounded-xl bg-white shadow-md transition duration-300 hover:-translate-y-2 hover:shadow-xl no-underline">
                     <div class="relative h-48 overflow-hidden">
-                        <img src="{{ $service['image'] }}" alt="{{ $service['title'] }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-110">
+                        <x-responsive-image :src="$service['image']" :alt="$service['title']" variant="card" sizes="(min-width: 1024px) 25vw, 50vw" class="h-full w-full object-cover transition duration-500 group-hover:scale-110" />
                         <div class="absolute inset-0 bg-linear-to-t from-black/60 to-transparent"></div>
                         <div class="absolute -bottom-6 right-6 z-10 flex h-12 w-12 items-center justify-center rounded-full border-4 border-white bg-primary text-white shadow-lg transition group-hover:bg-dark-cyan">
                             @include('components.icon', ['name' => $service['icon'], 'class' => 'w-5 h-5'])

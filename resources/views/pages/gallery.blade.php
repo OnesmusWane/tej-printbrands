@@ -16,7 +16,7 @@
             <div class="grid auto-rows-[200px] grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
                 @foreach ($galleryImages as $image)
                     <button type="button" data-gallery-image="{{ $image['url'] }}" class="group relative overflow-hidden rounded-xl {{ $image['span'] }}" aria-label="Open gallery image {{ $loop->iteration }}">
-                        <img src="{{ $image['url'] }}" alt="Gallery item {{ $loop->iteration }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-110">
+                        <x-responsive-image :src="$image['url']" :alt="'Gallery item '.$loop->iteration" variant="card" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 100vw" class="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
                         <span class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100"><span class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm">@include('components.icon', ['name' => 'zoom', 'class' => 'w-6 h-6'])</span></span>
                     </button>
                 @endforeach

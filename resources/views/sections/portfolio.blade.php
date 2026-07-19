@@ -29,7 +29,7 @@
             <div class="grid gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($portfolioItems as $item)
                     <article data-portfolio-card data-category="{{ $item['category'] }}" data-index="{{ $loop->index }}" class="{{ $loop->index >= 6 ? 'hidden' : '' }} group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-xl bg-slate-100 shadow-md" data-project='@json($item)'>
-                        <img src="{{ $item['image'] }}" alt="{{ $item['title'] }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-110">
+                        <x-responsive-image :src="$item['image']" :alt="$item['title']" variant="card" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" class="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
                         <div class="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-6 opacity-0 transition duration-300 group-hover:opacity-100">
                             <span class="mb-2 text-sm font-bold text-cyan-300">{{ $item['category'] }}</span>
                             <h3 class="mb-4 text-xl font-extrabold text-white">{{ $item['title'] }}</h3>

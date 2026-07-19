@@ -23,7 +23,7 @@
                 <article class="group rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                     @if ($post->image_url)
                         <div class="aspect-[16/9] overflow-hidden">
-                            <img src="{{ $post->image_url }}" alt="{{ $post->title }}" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105">
+                            <x-responsive-image :src="$post->image_url" :alt="$post->title" variant="card" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         </div>
                     @else
                         <div class="aspect-[16/9] bg-gradient-to-br from-cyan-50 to-slate-100 flex items-center justify-center">

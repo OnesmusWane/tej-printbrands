@@ -15,6 +15,7 @@
     @endif
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    @stack('preload')
     @vite(['resources/css/app.css', 'resources/js/app.ts'])
 </head>
 <body class="bg-white font-sans text-slate-800 antialiased">

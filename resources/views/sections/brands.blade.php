@@ -18,7 +18,7 @@
                     <div class="flex items-center gap-4">
                         <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 p-2">
                             @if ($logoSrc)
-                                <img src="{{ $logoSrc }}" alt="{{ $brand['name'] }} logo" class="max-h-full max-w-full object-contain" loading="lazy">
+                                <x-responsive-image :src="$logoSrc" :alt="$brand['name'].' logo'" variant="thumb" sizes="56px" class="max-h-full max-w-full object-contain" />
                             @else
                                 <span class="text-xl font-extrabold text-slate-400">{{ strtoupper(substr($brand['name'], 0, 1)) }}</span>
                             @endif

@@ -1,4 +1,6 @@
 @php
+    use App\Services\ImagePipeline;
+
     $h   = $heroSection;
     $cfg = $h?->settings ?? [];
     $heading      = $h?->heading  ?? 'Creative Design, Professional Printing & Business Branding Solutions.';
@@ -6,10 +8,21 @@
     $ctaPrimary   = $cfg["cta_primary"]   ?? 'Request a Quote';
     $ctaSecondary = $cfg["cta_secondary"] ?? 'Book a Service';
     $ctaTertiary  = $cfg["cta_tertiary"]  ?? 'View Our Work';
+
+    $heroImageUrl = $h?->image_url;
+    if ($heroImageUrl && ImagePipeline::relativePathFromUrl($heroImageUrl) !== null) {
+        $heroImageUrl = ImagePipeline::conversionUrl($heroImageUrl, 'hero');
+    }
 @endphp
+
+@if ($heroImageUrl)
+    @push('preload')
+        <link rel="preload" as="image" href="{{ $heroImageUrl }}" fetchpriority="high">
+    @endpush
+@endif
 <section id="home" class="relative flex min-h-[90vh] items-center overflow-hidden bg-slate-950 pt-32 pb-24 lg:pt-44">
     @if (!empty($h?->image_url))
-        <img src="{{ $h->image_url }}" alt="Professional printing equipment" class="absolute inset-0 h-full w-full object-cover">
+        <x-responsive-image :src="$h->image_url" alt="Professional printing equipment" variant="hero" sizes="100vw" :eager="true" class="absolute inset-0 h-full w-full object-cover" />
     @endif
     <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/70 to-slate-900/25"></div>
     <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>

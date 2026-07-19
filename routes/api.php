@@ -1,19 +1,20 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminDashboardController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\GalleryItemController;
-use App\Http\Controllers\Admin\SiteSectionController;
-use App\Http\Controllers\Admin\QuoteRequestController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminResourceController;
 use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Admin\BookingPaymentController;
+use App\Http\Controllers\Admin\GalleryItemController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\QuotationController;
+use App\Http\Controllers\Admin\QuoteRequestController;
 use App\Http\Controllers\Admin\ServiceRequestController;
+use App\Http\Controllers\Admin\SiteSectionController;
+use App\Http\Controllers\Admin\UploadController;
+use App\Http\Controllers\Admin\UserController;
 use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -21,16 +22,13 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['web', 'auth', 'admin'])->prefix('admin')->name('api.admin.')->group(function () {
     Route::get('/dashboard', AdminDashboardController::class)->name('dashboard');
 
-    // Image upload — stores file and returns public URL
-    Route::post('/upload', function (Request $request) {
-        $request->validate(['file' => ['required', 'file', 'image', 'max:8192']]);
-        $path = $request->file('file')->store('uploads/content', 'public');
-        return response()->json(['url' => asset('storage/' . $path)]);
-    })->name('upload');
+    // Image upload — stores file, generates thumb/card/hero WebP conversions, returns public URL
+    Route::post('/upload', [UploadController::class, 'store'])->name('upload');
 
     // Site settings: key-based upsert (Vue Settings page patches by key string)
     Route::patch('/site-settings/{key}', function (Request $request, string $key) {
         $record = SiteSetting::updateOrCreate(['key' => $key], ['value' => $request->input('value')]);
+
         return response()->json($record);
     })->name('settings.update')->where('key', '[a-z_]+');
 
@@ -81,10 +79,11 @@ Route::middleware(['web', 'auth', 'admin'])->prefix('admin')->name('api.admin.')
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.record');
     Route::patch('/payments/{payment}', [PaymentController::class, 'update'])->name('payments.update');
 
-    Route::post('profile/change-password', function(Illuminate\Http\Request $request) {
-        $request->validate(['current_password'=>['required','current_password'],'password'=>['required','min:8','confirmed']]);
-        $request->user()->update(['password'=>bcrypt($request->password)]);
-        return response()->json(['message'=>'Password updated successfully.']);
+    Route::post('profile/change-password', function (Request $request) {
+        $request->validate(['current_password' => ['required', 'current_password'], 'password' => ['required', 'min:8', 'confirmed']]);
+        $request->user()->update(['password' => bcrypt($request->password)]);
+
+        return response()->json(['message' => 'Password updated successfully.']);
     })->name('profile.change-password');
 
     // User management

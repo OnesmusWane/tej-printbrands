@@ -14,7 +14,7 @@
         @php $co = $siteSettings['company'] ?? []; @endphp
         <a href="{{ route('home') }}" class="group flex min-w-0 items-center gap-2">
             @if (!empty($co['logo_url']))
-                <img src="{{ $co['logo_url'] }}" alt="{{ $co['company_name'] ?? 'Tej Printbrands' }}" class="h-10 w-auto object-contain shrink-0">
+                <x-responsive-image :src="$co['logo_url']" :alt="$co['company_name'] ?? 'Tej Printbrands'" variant="thumb" sizes="120px" :eager="true" class="h-10 w-auto object-contain shrink-0" />
             @else
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan text-xl font-bold text-white transition-colors group-hover:bg-cyan-600">TJ</span>
                 <span class="truncate text-xl font-extrabold text-dark sm:text-2xl">{{ $co['company_name'] ?? 'Tej' }} <span class="text-cyan">{{ empty($co['company_name']) ? 'Printbrands' : '' }}</span></span>
@@ -101,7 +101,7 @@
         <div class="flex items-center justify-between border-b border-gray-100 px-4 py-4">
             <a href="{{ route('home') }}" class="flex items-center gap-2" data-mobile-menu-close>
                 @if (!empty($co['logo_url']))
-                    <img src="{{ $co['logo_url'] }}" alt="{{ $co['company_name'] ?? 'Tej Printbrands' }}" class="h-9 w-auto object-contain">
+                    <x-responsive-image :src="$co['logo_url']" :alt="$co['company_name'] ?? 'Tej Printbrands'" variant="thumb" sizes="120px" class="h-9 w-auto object-contain" />
                 @else
                     <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan text-xl font-bold text-white">TJ</span>
                     <span class="text-xl font-bold text-dark">Tej <span class="text-cyan">Printbrands</span></span>

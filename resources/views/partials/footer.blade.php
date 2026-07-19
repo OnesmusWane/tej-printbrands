@@ -32,7 +32,7 @@
         <div>
             <a href="{{ route('home') }}" class="mb-4 inline-flex items-center gap-2">
                 @if ($logoUrl)
-                    <img src="{{ $logoUrl }}" alt="{{ $companyName }}" class="h-10 w-auto object-contain">
+                    <x-responsive-image :src="$logoUrl" :alt="$companyName" variant="thumb" sizes="120px" class="h-10 w-auto object-contain" />
                 @else
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan text-xl font-bold text-white">TJ</span>
                     <span class="text-2xl font-bold tracking-tight text-white">{{ $companyName }}</span>
