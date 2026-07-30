@@ -1,6 +1,38 @@
 @extends('layouts.site')
 
 @section('title', 'Premium Products | Tej Printbrands')
+@section('canonical', route('products'))
+@section('meta_description', 'Shop premium print products from Tej Printbrands — professionally designed, boardroom-ready packages with M-Pesa, bank transfer, and card checkout.')
+@section('meta_keywords', 'print products, premium printing packages, buy printing online Kenya, business cards, corporate print products')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Premium Products', 'url' => route('products')],
+]])
+
+@php
+    $productListSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'ItemList',
+        'itemListElement' => collect($products)->values()->map(fn ($product, $i) => array_filter([
+            '@type' => 'Product',
+            'position' => $i + 1,
+            'name' => $product['name'],
+            'description' => $product['description'] ?? null,
+            'image' => $product['images'][0] ?? $product['image'] ?? null,
+            'offers' => [
+                '@type' => 'Offer',
+                'priceCurrency' => 'KES',
+                'price' => (string) $product['price'],
+                'url' => route('products'),
+            ],
+        ]))->all(),
+    ];
+@endphp
+
+@push('schema')
+    <script type="application/ld+json">{!! json_encode($productListSchema, JSON_UNESCAPED_SLASHES) !!}</script>
+@endpush
 
 @section('content')
     @php

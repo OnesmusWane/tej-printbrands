@@ -7,7 +7,28 @@
     @php
         $co = $siteSettings['company'] ?? [];
         $ct = $siteSettings['contact'] ?? [];
+        $socials = $siteSettings['socials'] ?? [];
+        $defaultDescription = $co['description'] ?? 'Tej Printbrands delivers creative design, professional printing, and complete branding solutions in Kenya.';
+        $defaultOgImage = $co['logo_url'] ?? asset('assets/images/printing.jpg');
+        $siteName = $co['company_name'] ?? 'Tej Printbrands';
     @endphp
+    <meta name="description" content="@yield('meta_description', $defaultDescription)">
+    <meta name="keywords" content="@yield('meta_keywords', 'printing company Kenya, graphic design, branding agency, signage, promotional products')">
+    <link rel="canonical" href="@yield('canonical', url()->current())">
+
+    <meta property="og:type" content="@yield('og_type', 'website')">
+    <meta property="og:site_name" content="{{ $siteName }}">
+    <meta property="og:title" content="@yield('title', $siteName)">
+    <meta property="og:description" content="@yield('meta_description', $defaultDescription)">
+    <meta property="og:image" content="@yield('og_image', $defaultOgImage)">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:locale" content="en_US">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="@yield('title', $siteName)">
+    <meta name="twitter:description" content="@yield('meta_description', $defaultDescription)">
+    <meta name="twitter:image" content="@yield('og_image', $defaultOgImage)">
+
     @if (!empty($co['favicon_url']))
         <link rel="icon" href="{{ $co['favicon_url'] }}">
     @else
@@ -15,8 +36,34 @@
     @endif
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap">
     @stack('preload')
     @vite(['resources/css/app.css', 'resources/js/app.ts'])
+
+    @php
+        $localBusiness = array_filter([
+            '@context' => 'https://schema.org',
+            '@type' => 'LocalBusiness',
+            'name' => $siteName,
+            'description' => $co['description'] ?? null,
+            'image' => $co['logo_url'] ?? null,
+            'url' => url('/'),
+            'telephone' => $ct['phone'] ?? null,
+            'email' => $ct['email'] ?? null,
+            'address' => !empty($ct['address']) ? ['@type' => 'PostalAddress', 'streetAddress' => $ct['address']] : null,
+            'openingHours' => $ct['hours'] ?? null,
+            'sameAs' => array_values(array_filter([
+                $socials['facebook'] ?? null,
+                $socials['instagram'] ?? null,
+                $socials['twitter'] ?? null,
+                $socials['linkedin'] ?? null,
+                $socials['youtube'] ?? null,
+                $socials['tiktok'] ?? null,
+            ])) ?: null,
+        ]);
+    @endphp
+    <script type="application/ld+json">{!! json_encode($localBusiness, JSON_UNESCAPED_SLASHES) !!}</script>
+    @stack('schema')
 </head>
 <body class="bg-white font-sans text-slate-800 antialiased">
     @include('partials.navbar')

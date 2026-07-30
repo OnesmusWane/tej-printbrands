@@ -1,6 +1,34 @@
 @extends('layouts.site')
 
 @section('title', $service->title . ' | Tej Printbrands')
+@section('canonical', route('service.detail', $service->slug))
+@section('meta_description', \Illuminate\Support\Str::limit($service->description, 155))
+@section('meta_keywords', strtolower($service->title) . ', printing services Kenya, Tej Printbrands')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Services', 'url' => route('services')],
+    ['name' => $service->title, 'url' => route('service.detail', $service->slug)],
+]])
+
+@php
+    $serviceSchema = array_filter([
+        '@context' => 'https://schema.org',
+        '@type' => 'Service',
+        'name' => $service->title,
+        'description' => $service->description,
+        'image' => $service->image_url ?? null,
+        'url' => route('service.detail', $service->slug),
+        'provider' => [
+            '@type' => 'Organization',
+            'name' => $siteSettings['company']['company_name'] ?? 'Tej Printbrands',
+        ],
+    ]);
+@endphp
+
+@push('schema')
+    <script type="application/ld+json">{!! json_encode($serviceSchema, JSON_UNESCAPED_SLASHES) !!}</script>
+@endpush
 
 @section('content')
     @php

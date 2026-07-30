@@ -1,6 +1,14 @@
 @extends('layouts.site')
 
 @section('title', 'Book a Service or Request a Quote | Tej Printbrands')
+@section('canonical', route('booking'))
+@section('meta_description', "Book a design, print, or branding service with Tej Printbrands, or request a custom quote — tell us your project details and we'll confirm pricing and timeline.")
+@section('meta_keywords', 'book printing service, request quote, custom print quote Kenya, branding service booking')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Book a Service', 'url' => route('booking')],
+]])
 
 @php
     $selectedPackage    = old('package', request('package', ''));

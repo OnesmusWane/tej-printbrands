@@ -1,6 +1,47 @@
 @extends('layouts.site')
 
 @section('title', $post->title . ' | Tej Printbrands')
+@section('canonical', route('blog.detail', $post->slug))
+@section('og_type', 'article')
+@section('meta_description', $post->excerpt ?? \Illuminate\Support\Str::limit(strip_tags($post->content ?? ''), 155))
+@section('meta_keywords', strtolower($post->category ?? 'branding') . ', ' . strtolower($post->title) . ', Tej Printbrands blog')
+@if ($post->image_url)
+    @section('og_image', $post->image_url)
+@endif
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Insights & News', 'url' => route('blog')],
+    ['name' => $post->title, 'url' => route('blog.detail', $post->slug)],
+]])
+
+@php
+    $articleSchema = array_filter([
+        '@context' => 'https://schema.org',
+        '@type' => 'Article',
+        'headline' => $post->title,
+        'description' => $post->excerpt ?? null,
+        'image' => $post->image_url ?? null,
+        'author' => [
+            '@type' => 'Person',
+            'name' => $post->author ?? 'Tej Printbrands',
+        ],
+        'datePublished' => $post->published_at?->toIso8601String(),
+        'publisher' => [
+            '@type' => 'Organization',
+            'name' => $siteSettings['company']['company_name'] ?? 'Tej Printbrands',
+            'logo' => !empty($siteSettings['company']['logo_url']) ? [
+                '@type' => 'ImageObject',
+                'url' => $siteSettings['company']['logo_url'],
+            ] : null,
+        ],
+        'mainEntityOfPage' => route('blog.detail', $post->slug),
+    ]);
+@endphp
+
+@push('schema')
+    <script type="application/ld+json">{!! json_encode($articleSchema, JSON_UNESCAPED_SLASHES) !!}</script>
+@endpush
 
 @section('content')
 

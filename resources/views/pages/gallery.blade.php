@@ -1,6 +1,27 @@
 @extends('layouts.site')
 
 @section('title', 'Gallery | Tej Printbrands')
+@section('canonical', route('gallery'))
+@section('meta_description', "Browse a curated visual gallery of Tej Printbrands' design, print, and branding work — real projects showcasing our craftsmanship and creativity.")
+@section('meta_keywords', 'design gallery, printing portfolio images, branding visuals, print work gallery')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Gallery', 'url' => route('gallery')],
+]])
+
+@php
+    $galleryImageSchema = collect($galleryImages)->take(20)->values()->map(fn ($image, $i) => [
+        '@context' => 'https://schema.org',
+        '@type' => 'ImageObject',
+        'contentUrl' => $image['url'],
+        'name' => 'Gallery item ' . ($i + 1),
+    ])->all();
+@endphp
+
+@push('schema')
+    <script type="application/ld+json">{!! json_encode($galleryImageSchema, JSON_UNESCAPED_SLASHES) !!}</script>
+@endpush
 
 @section('content')
     <section class="min-h-screen bg-white pt-36 pb-20">

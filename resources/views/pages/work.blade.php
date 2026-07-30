@@ -1,6 +1,14 @@
 @extends('layouts.site')
 
 @section('title', 'Our Work | Tej Printbrands')
+@section('canonical', route('work'))
+@section('meta_description', "Browse Tej Printbrands' portfolio of completed design, print, and branding projects — real case studies, challenges solved, and results delivered for our clients.")
+@section('meta_keywords', 'portfolio, case studies, branding projects, printing portfolio, design work Kenya')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Our Work', 'url' => route('work')],
+]])
 
 @section('content')
     @php

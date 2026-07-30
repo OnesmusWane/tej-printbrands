@@ -1,6 +1,14 @@
 @extends('layouts.site')
 
 @section('title', 'Insights & News | Tej Printbrands')
+@section('canonical', route('blog'))
+@section('meta_description', 'Insights, tips, and industry trends on graphic design, printing, and branding from the Tej Printbrands team — practical guides to help your business grow.')
+@section('meta_keywords', 'printing blog, design tips, branding trends, print industry insights')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Insights & News', 'url' => route('blog')],
+]])
 
 @section('content')
 

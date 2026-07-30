@@ -1,6 +1,14 @@
 @extends('layouts.site')
 
 @section('title', 'Contact | Tej Printbrands')
+@section('canonical', route('contact'))
+@section('meta_description', 'Get in touch with Tej Printbrands for design, printing, and branding inquiries — visit our studio, call, email, or send a message and our team will respond.')
+@section('meta_keywords', 'contact Tej Printbrands, printing company contact Kenya, request a quote, branding inquiries')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Contact', 'url' => route('contact')],
+]])
 
 @section('content')
     @php

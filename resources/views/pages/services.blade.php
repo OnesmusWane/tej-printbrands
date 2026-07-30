@@ -1,6 +1,14 @@
 @extends('layouts.site')
 
 @section('title', 'Services | Tej Printbrands')
+@section('canonical', route('services'))
+@section('meta_description', "Explore Tej Printbrands' full range of design, printing, and branding services — from graphic design and signage to large-format printing, tailored packages, and transparent pricing.")
+@section('meta_keywords', 'printing services Kenya, graphic design services, branding services, signage, promotional printing, print packages')
+
+@include('partials.breadcrumb-schema', ['items' => [
+    ['name' => 'Home', 'url' => route('home')],
+    ['name' => 'Services', 'url' => route('services')],
+]])
 
 @section('content')
     @php
