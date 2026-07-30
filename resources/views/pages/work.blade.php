@@ -51,7 +51,7 @@
             </div>
             @foreach ($caseStudies as $study)
                 <article class="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xl lg:flex">
-                    <div class="h-72 lg:h-auto lg:w-1/2"><img src="{{ $study['image'] }}" alt="{{ $study['title'] }}" class="h-full w-full object-cover"></div>
+                    <div class="h-72 lg:h-auto lg:w-1/2"><x-responsive-image :src="$study['image']" :alt="$study['title']" variant="card" sizes="(min-width: 1024px) 50vw, 100vw" class="h-full w-full object-cover" /></div>
                     <div class="p-8 md:p-12 lg:w-1/2">
                         <span class="mb-2 block text-sm font-extrabold uppercase tracking-wider text-cyan">{{ $study['client'] }}</span>
                         <h3 class="mb-6 text-3xl font-extrabold text-slate-900">{{ $study['title'] }}</h3>

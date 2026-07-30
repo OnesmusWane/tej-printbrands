@@ -54,7 +54,7 @@
     @endphp
 
     <section class="relative overflow-hidden bg-slate-950 pt-36 pb-24">
-        <img src="{{ $heroSec?->image_url ?? asset('assets/images/printing.jpg') }}" alt="Premium print products" class="absolute inset-0 h-full w-full object-cover opacity-30">
+        <x-responsive-image :src="$heroSec?->image_url ?? asset('assets/images/printing.jpg')" alt="Premium print products" variant="hero" sizes="100vw" :eager="true" class="absolute inset-0 h-full w-full object-cover opacity-30" />
         <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900/95 to-slate-900/70"></div>
         <div class="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl">
@@ -100,8 +100,7 @@
                                 {{-- Single image: full-width, click to lightbox --}}
                                 <div class="relative h-56 overflow-hidden cursor-pointer"
                                      onclick="openLightbox('{{ $coverImg }}', '{{ addslashes($product['name']) }}')">
-                                    <img src="{{ $coverImg }}" alt="{{ $product['name'] }}"
-                                         class="h-full w-full object-cover transition duration-700 group-hover:scale-110">
+                                    <x-responsive-image :src="$coverImg" :alt="$product['name']" variant="card" sizes="(min-width: 1280px) 25vw, (min-width: 768px) 50vw, 100vw" class="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
                                     <div class="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <span class="rounded-lg bg-black/60 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
                                             View full image
@@ -115,8 +114,7 @@
                                     {{-- Main cover image (left, ~60%) --}}
                                     <div class="relative flex-[3] cursor-pointer overflow-hidden"
                                          onclick="openLightbox('{{ $coverImg }}', '{{ addslashes($product['name']) }}')">
-                                        <img src="{{ $coverImg }}" alt="{{ $product['name'] }}"
-                                             class="h-full w-full object-cover transition duration-700 group-hover:scale-105">
+                                        <x-responsive-image :src="$coverImg" :alt="$product['name']" variant="card" sizes="(min-width: 1280px) 15vw, (min-width: 768px) 30vw, 60vw" class="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
                                         <div class="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors"></div>
                                     </div>
 
@@ -129,8 +127,7 @@
                                             @endphp
                                             <div class="relative flex-1 cursor-pointer overflow-hidden"
                                                  onclick="openLightbox('{{ $thumb }}', '{{ addslashes($product['name']) }}')">
-                                                <img src="{{ $thumb }}" alt="{{ $product['name'] }} {{ $tIdx + 2 }}"
-                                                     class="h-full w-full object-cover transition duration-300 hover:scale-105">
+                                                <x-responsive-image :src="$thumb" :alt="$product['name'] . ' ' . ($tIdx + 2)" variant="thumb" sizes="100px" class="h-full w-full object-cover transition duration-300 hover:scale-105" />
                                                 @if ($showMore)
                                                     <div class="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-[1px]">
                                                         <span class="text-base font-extrabold text-white">+{{ $moreCount + 1 }}</span>

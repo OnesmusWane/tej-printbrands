@@ -86,7 +86,7 @@
                 {{-- Hero image --}}
                 @if ($post->image_url)
                     <div class="mx-8 mb-0 overflow-hidden rounded-2xl md:mx-16">
-                        <img src="{{ $post->image_url }}" alt="{{ $post->title }}" class="h-64 w-full object-cover md:h-80 lg:h-96">
+                        <x-responsive-image :src="$post->image_url" :alt="$post->title" variant="hero" sizes="(min-width: 768px) 800px, 100vw" :eager="true" class="h-64 w-full object-cover md:h-80 lg:h-96" />
                     </div>
                 @endif
 
@@ -138,7 +138,7 @@
                             <a href="{{ route('blog.detail', $rel->slug) }}" class="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:shadow-lg">
                                 <div class="relative h-44 overflow-hidden">
                                     @if ($rel->image_url)
-                                        <img src="{{ $rel->image_url }}" alt="{{ $rel->title }}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                        <x-responsive-image :src="$rel->image_url" :alt="$rel->title" variant="card" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                     @else
                                         <div class="flex h-full w-full items-center justify-center bg-linear-to-br from-cyan-50 to-slate-100">
                                             <svg class="h-10 w-10 text-cyan-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>

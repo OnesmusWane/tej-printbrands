@@ -45,7 +45,7 @@
     {{-- Hero --}}
     <div class="relative flex min-h-[420px] items-end overflow-hidden bg-slate-950 pb-12 pt-32">
         @if ($service->image_url)
-            <img src="{{ $service->image_url }}" alt="{{ $service->title }}" class="absolute inset-0 h-full w-full object-cover opacity-40">
+            <x-responsive-image :src="$service->image_url" :alt="$service->title" variant="hero" sizes="100vw" :eager="true" class="absolute inset-0 h-full w-full object-cover opacity-40" />
         @endif
         <div class="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
         <div class="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -128,7 +128,7 @@
                                             <div class="{{ count($subImages) > 1 ? 'w-3/5 shrink-0' : 'relative w-full' }} overflow-hidden cursor-zoom-in"
                                                  onclick="openLightbox('{{ addslashes($subImages[0]) }}', '{{ addslashes($subTitle) }}')"
                                                  title="Click to enlarge">
-                                                <img src="{{ $subImages[0] }}" alt="{{ $subTitle }}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                                <x-responsive-image :src="$subImages[0]" :alt="$subTitle" variant="card" sizes="(min-width: 640px) 40vw, 60vw" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                                 @if (count($subImages) === 1)
                                                     <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity pointer-events-none">
                                                         <svg class="w-8 h-8 text-white drop-shadow" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
@@ -141,7 +141,7 @@
                                                         <div class="relative flex-1 overflow-hidden cursor-zoom-in"
                                                              onclick="openLightbox('{{ addslashes($imgUrl) }}', '{{ addslashes($subTitle) }}')"
                                                              title="Click to enlarge">
-                                                            <img src="{{ $imgUrl }}" alt="{{ $subTitle }}" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+                                                            <x-responsive-image :src="$imgUrl" :alt="$subTitle" variant="thumb" sizes="120px" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300" />
                                                             @if ($si === 2 && count($subImages) > 4)
                                                                 <div class="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
                                                                     <span class="text-white font-bold text-lg">+{{ count($subImages) - 4 }}</span>
@@ -173,7 +173,7 @@
                                                             <div class="h-16 w-16 shrink-0 overflow-hidden rounded-xl cursor-zoom-in border border-slate-100 shadow-sm"
                                                                  onclick="openLightbox('{{ addslashes($imgUrl) }}', '{{ addslashes($subTitle) }}')"
                                                                  title="Click to enlarge">
-                                                                <img src="{{ $imgUrl }}" alt="{{ $subTitle }}" class="h-full w-full object-cover hover:scale-110 transition-transform duration-200">
+                                                                <x-responsive-image :src="$imgUrl" :alt="$subTitle" variant="thumb" sizes="64px" class="h-full w-full object-cover hover:scale-110 transition-transform duration-200" />
                                                             </div>
                                                         @endforeach
                                                     </div>
@@ -201,7 +201,7 @@
                                                                     <div class="{{ count($nsImages) > 1 ? 'w-3/5 shrink-0' : 'w-full' }} overflow-hidden cursor-zoom-in"
                                                                          onclick="openLightbox('{{ addslashes($nsImages[0]) }}', '{{ addslashes($nsTitle) }}')"
                                                                          title="Click to enlarge">
-                                                                        <img src="{{ $nsImages[0] }}" alt="{{ $nsTitle }}" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+                                                                        <x-responsive-image :src="$nsImages[0]" :alt="$nsTitle" variant="card" sizes="(min-width: 640px) 25vw, 45vw" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300" />
                                                                     </div>
                                                                     @if (count($nsImages) > 1)
                                                                         <div class="flex flex-1 flex-col gap-0.5 ml-0.5 overflow-hidden">
@@ -209,7 +209,7 @@
                                                                                 <div class="relative flex-1 overflow-hidden cursor-zoom-in"
                                                                                      onclick="openLightbox('{{ addslashes($nsImgUrl) }}', '{{ addslashes($nsTitle) }}')"
                                                                                      title="Click to enlarge">
-                                                                                    <img src="{{ $nsImgUrl }}" alt="{{ $nsTitle }}" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300">
+                                                                                    <x-responsive-image :src="$nsImgUrl" :alt="$nsTitle" variant="thumb" sizes="100px" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300" />
                                                                                     @if ($nsi === 2 && count($nsImages) > 4)
                                                                                         <div class="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
                                                                                             <span class="text-white font-bold text-sm">+{{ count($nsImages) - 4 }}</span>

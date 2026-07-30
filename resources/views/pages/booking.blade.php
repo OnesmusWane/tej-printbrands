@@ -19,7 +19,7 @@
 
 @section('content')
     <section class="relative overflow-hidden bg-slate-950 pt-36 pb-20">
-        <img src="{{ asset('assets/images/printing.jpg') }}" alt="Printing studio" class="absolute inset-0 h-full w-full object-cover opacity-35">
+        <x-responsive-image :src="asset('assets/images/printing.jpg')" alt="Printing studio" variant="hero" sizes="100vw" :eager="true" class="absolute inset-0 h-full w-full object-cover opacity-35" />
         <div class="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-900/90 to-slate-900/70"></div>
         <div class="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl">
