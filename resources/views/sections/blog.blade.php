@@ -20,7 +20,7 @@
         </div>
         <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             @foreach ($recentBlogPosts as $post)
-                <article class="group rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                <a href="{{ route('blog.detail', $post->slug) }}" class="group block rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                     @if ($post->image_url)
                         <div class="aspect-[16/9] overflow-hidden">
                             <x-responsive-image :src="$post->image_url" :alt="$post->title" variant="card" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -43,7 +43,7 @@
                             <span>{{ $post->published_at?->format('M d, Y') ?? '' }}</span>
                         </div>
                     </div>
-                </article>
+                </a>
             @endforeach
         </div>
     </div>
