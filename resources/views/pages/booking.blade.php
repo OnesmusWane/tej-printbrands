@@ -49,7 +49,7 @@
                     </div>
                 @endif
 
-                <form action="{{ route('booking.submit') }}" method="post" class="space-y-7">
+                <form action="{{ route('booking.submit') }}" method="post" enctype="multipart/form-data" class="space-y-7">
                     @csrf
                     <input type="hidden" name="package" value="{{ $selectedPackage }}">
                     <div>
@@ -111,17 +111,33 @@
                     </div>
 
                     <label class="block space-y-2 text-sm font-semibold text-slate-700">Estimated Budget
-                        <select name="budget" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            <option value="">Select a range</option>
-                            @foreach (['Below KES 10,000', 'KES 10,000 - 30,000', 'KES 30,000 - 75,000', 'KES 75,000+', 'Not sure yet'] as $budget)
-                                <option value="{{ $budget }}" @selected(old('budget', request('budget')) === $budget)>{{ $budget }}</option>
+                        <input
+                            type="text"
+                            name="budget"
+                            list="budget-suggestions"
+                            value="{{ old('budget', request('budget')) }}"
+                            placeholder="Pick a range below, or type your own"
+                            autocomplete="off"
+                            class="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        >
+                        <datalist id="budget-suggestions">
+                            @foreach (['Below Ksh 10,000', 'Ksh 10,000 - 30,000', 'Ksh 30,000 - 75,000', 'Ksh 75,000+', 'Not sure yet'] as $budget)
+                                <option value="{{ $budget }}"></option>
                             @endforeach
-                        </select>
+                        </datalist>
+                        @error('budget') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
                     </label>
 
                     <label class="block space-y-2 text-sm font-semibold text-slate-700">Project Details
                         <textarea name="message" rows="6" class="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Share quantity, sizes, material, finishing, delivery location, or any brand references.">{{ old('message') }}</textarea>
                         @error('message') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
+                    </label>
+
+                    <label class="block space-y-2 text-sm font-semibold text-slate-700">
+                        Already have your artwork designed? Upload it here
+                        <span class="block text-xs font-normal text-slate-500">Optional — PDF, AI, PSD, EPS, JPG, PNG, or ZIP, up to 10MB.</span>
+                        <input type="file" name="artwork" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200">
+                        @error('artwork') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
                     </label>
 
                     <button type="submit" class="w-full rounded-lg bg-slate-900 px-6 py-4 text-lg font-extrabold text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-slate-800">Submit Request</button>

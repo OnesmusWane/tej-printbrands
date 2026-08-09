@@ -193,7 +193,7 @@ async function deleteOrder(id: number) {
 }
 
 function fmt(n: number) {
-    return 'KES ' + Number(n).toLocaleString('en-KE', { minimumFractionDigits: 0 })
+    return 'Ksh ' + Number(n).toLocaleString('en-KE', { minimumFractionDigits: 0 })
 }
 
 function fmtDate(d: string) {
@@ -224,7 +224,7 @@ async function printReceipt(order: Order) {
     const paybill     = ct.mpesa_shortcode ?? co.mpesa_shortcode ?? ''
     const paybillAcct = ct.paybill_account ?? ''
 
-    const fmtAmt = (n: number) => 'KES ' + Number(n).toLocaleString('en-KE', { minimumFractionDigits: 0 })
+    const fmtAmt = (n: number) => 'Ksh ' + Number(n).toLocaleString('en-KE', { minimumFractionDigits: 0 })
 
     const rowsHtml = (order.items ?? []).map(item => `
         <tr>
@@ -882,7 +882,7 @@ onMounted(load)
                                             <div>
                                                 <div class="text-sm font-medium text-gray-900">{{ p.name }}</div>
                                                 <div class="text-xs text-gray-400">
-                                                    KES {{ Number(p.price).toLocaleString() }}
+                                                    Ksh {{ Number(p.price).toLocaleString() }}
                                                     <span v-if="p.unit"> · {{ p.unit }}</span>
                                                     <span v-if="p.stock_quantity !== null && p.stock_quantity !== undefined"
                                                           :class="['ml-2 font-semibold', p.stock_quantity === 0 ? 'text-red-500' : p.stock_quantity <= 5 ? 'text-orange-500' : 'text-emerald-600']">

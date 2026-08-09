@@ -314,7 +314,7 @@ onMounted(async () => {
             </div>
             <span class="text-sm font-medium text-gray-600">Total Collected</span>
           </div>
-          <div class="text-xl font-bold text-gray-900">KES {{ fmt(totalRevenue()) }}</div>
+          <div class="text-xl font-bold text-gray-900">Ksh {{ fmt(totalRevenue()) }}</div>
           <div class="text-xs text-gray-500 mt-1">{{ payments.length }} transactions</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -324,7 +324,7 @@ onMounted(async () => {
             </div>
             <span class="text-sm font-medium text-gray-600">Cash</span>
           </div>
-          <div class="text-xl font-bold text-gray-900">KES {{ fmt(methodTotal('cash')) }}</div>
+          <div class="text-xl font-bold text-gray-900">Ksh {{ fmt(methodTotal('cash')) }}</div>
           <div class="text-xs text-gray-500 mt-1">{{ countMethod('cash') }} transactions</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -334,7 +334,7 @@ onMounted(async () => {
             </div>
             <span class="text-sm font-medium text-gray-600">M-Pesa</span>
           </div>
-          <div class="text-xl font-bold text-gray-900">KES {{ fmt(methodTotal('mpesa')) }}</div>
+          <div class="text-xl font-bold text-gray-900">Ksh {{ fmt(methodTotal('mpesa')) }}</div>
           <div class="text-xs text-gray-500 mt-1">{{ countMethod('mpesa') }} transactions</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -344,7 +344,7 @@ onMounted(async () => {
             </div>
             <span class="text-sm font-medium text-gray-600">Bank Transfer</span>
           </div>
-          <div class="text-xl font-bold text-gray-900">KES {{ fmt(methodTotal('bank_transfer')) }}</div>
+          <div class="text-xl font-bold text-gray-900">Ksh {{ fmt(methodTotal('bank_transfer')) }}</div>
           <div class="text-xs text-gray-500 mt-1">{{ countMethod('bank_transfer') }} transactions</div>
         </div>
       </div>
@@ -390,7 +390,7 @@ onMounted(async () => {
                   {{ pmt.invoice_number ?? (pmt.invoice_id ? `INV #${pmt.invoice_id}` : '-') }}
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-900">{{ pmt.client ?? pmt.client_name }}</td>
-                <td class="px-6 py-4 text-sm font-semibold text-gray-900">KES {{ fmt(pmt.amount) }}</td>
+                <td class="px-6 py-4 text-sm font-semibold text-gray-900">Ksh {{ fmt(pmt.amount) }}</td>
                 <td class="px-6 py-4">
                   <span :class="['px-2.5 py-1 rounded-full text-xs font-medium border', methodClass(pmt.method ?? pmt.payment_method)]">
                     {{ methodLabel(pmt.method ?? pmt.payment_method) }}
@@ -445,7 +445,7 @@ onMounted(async () => {
                   class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 bg-white transition-all">
                   <option :value="0">None — standalone payment</option>
                   <option v-for="inv in invoices" :key="inv.id" :value="inv.id">
-                    {{ inv.invoice_number }} · {{ inv.client }} · KES {{ fmt(inv.amount - (inv.paid_amount ?? 0)) }} due
+                    {{ inv.invoice_number }} · {{ inv.client }} · Ksh {{ fmt(inv.amount - (inv.paid_amount ?? 0)) }} due
                   </option>
                 </select>
               </div>
@@ -457,7 +457,7 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (KES) <span class="text-red-500">*</span></label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh) <span class="text-red-500">*</span></label>
                   <input v-model.number="form.amount" type="number" min="1" placeholder="0"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
@@ -491,7 +491,7 @@ onMounted(async () => {
               </div>
             </div>
             <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-between items-center gap-3">
-              <p class="text-sm font-bold text-gray-900">KES <span style="color:#00BCD4;">{{ Number(form.amount || 0).toLocaleString() }}</span></p>
+              <p class="text-sm font-bold text-gray-900">Ksh <span style="color:#00BCD4;">{{ Number(form.amount || 0).toLocaleString() }}</span></p>
               <div class="flex gap-2">
                 <button @click="closeModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancel</button>
                 <button @click="submitPayment" :disabled="saving"

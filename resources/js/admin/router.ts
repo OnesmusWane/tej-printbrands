@@ -22,6 +22,7 @@ import Users           from './pages/Users.vue'
 import Blog            from './pages/Blog.vue'
 import Projects        from './pages/Projects.vue'
 import Orders         from './pages/Orders.vue'
+import DailyLedger    from './pages/DailyLedger.vue'
 
 const routes = [
     { path: '/',                   component: Dashboard,       meta: { title: 'Dashboard',        perm: 'dashboard.view' } },
@@ -40,6 +41,7 @@ const routes = [
     { path: '/invoices',           component: Invoices,        meta: { title: 'Invoices',          perm: 'invoices.view' } },
     { path: '/payments',           component: Payments,        meta: { title: 'Payments',          perm: 'payments.view' } },
     { path: '/orders',             component: Orders,          meta: { title: 'Orders',            perm: 'orders.view' } },
+    { path: '/daily-ledger',       component: DailyLedger,     meta: { title: 'Daily Sales & Expenses', perm: 'daily_ledger.view' } },
     { path: '/tasks',              component: Tasks,           meta: { title: 'Tasks',             perm: 'tasks.view' } },
     { path: '/blog',              component: Blog,            meta: { title: 'Blog',              perm: 'content.view' } },
     { path: '/projects',          component: Projects,        meta: { title: 'Projects',          perm: 'tasks.view' } },

@@ -36,7 +36,7 @@
                 <p class="text-sm text-slate-300">Order</p>
                 <p class="mb-4 font-extrabold">{{ $order->order_number }}</p>
                 <p class="text-sm text-slate-300">Amount</p>
-                <p class="mb-4 text-3xl font-extrabold text-primary">KES {{ number_format($order->total) }}</p>
+                <p class="mb-4 text-3xl font-extrabold text-primary">Ksh {{ number_format($order->total) }}</p>
                 <p class="text-sm text-slate-300">Status</p>
                 <p class="font-extrabold">{{ str_replace('_', ' ', ucfirst($order->payment_status)) }}</p>
             </aside>

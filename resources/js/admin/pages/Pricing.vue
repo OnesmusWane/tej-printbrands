@@ -156,7 +156,7 @@ onMounted(load)
             </div>
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                 <p class="text-xs text-gray-500 mb-1">Avg Price</p>
-                <p class="text-2xl font-bold text-gray-900">{{ avgValue !== '–' ? `KES ${avgValue}` : '–' }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ avgValue !== '–' ? `Ksh ${avgValue}` : '–' }}</p>
             </div>
         </div>
 
@@ -266,7 +266,7 @@ onMounted(load)
                                     <label class="block text-xs font-semibold text-gray-600 mb-1.5">Price <span class="text-red-400">*</span></label>
                                     <input v-model="editing.price" required
                                         class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                                        placeholder="From KES 15,000"/>
+                                        placeholder="From Ksh 15,000"/>
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -274,7 +274,7 @@ onMounted(load)
                                     <label class="block text-xs font-semibold text-gray-600 mb-1.5">Old / Crossed Price <span class="text-gray-400 font-normal">(optional)</span></label>
                                     <input v-model="editing.old_price"
                                         class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                                        placeholder="KES 60,000"/>
+                                        placeholder="Ksh 60,000"/>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-600 mb-1.5">Card Color</label>

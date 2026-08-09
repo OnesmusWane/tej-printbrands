@@ -30,6 +30,7 @@ interface Service {
     description: string;
     icon: string;
     image_url: string;
+    images?: string[];
     starting_price: string;
     features: string[] | string;
     sub_services?: SubService[];
@@ -85,8 +86,17 @@ async function load() {
 }
 
 function openNew() {
-    editing.value = { is_visible: true, features: [], sort_order: 0, sub_services: [] };
+    editing.value = { is_visible: true, features: [], sort_order: 0, sub_services: [], images: [] };
     showModal.value = true;
+}
+
+function addImageSlot() {
+    if (!editing.value.images) editing.value.images = [];
+    editing.value.images.push('');
+}
+
+function removeImage(idx: number) {
+    editing.value.images?.splice(idx, 1);
 }
 
 function addSubService() {
@@ -139,7 +149,7 @@ function normalizeSubServices(raw: any[]): SubService[] {
     });
 }
 
-function computeStartingPrice(): string {
+function subServicePrices(): number[] {
     const subs = editing.value.sub_services ?? [];
     const prices: number[] = [];
     for (const sub of subs) {
@@ -148,17 +158,30 @@ function computeStartingPrice(): string {
             if (ns.price != null && Number(ns.price) > 0) prices.push(Number(ns.price));
         }
     }
+    return prices;
+}
+
+function hasAutoPrice(): boolean {
+    return subServicePrices().length > 0;
+}
+
+function computeStartingPrice(): string {
+    const prices = subServicePrices();
     if (prices.length === 0) return editing.value.starting_price ?? '';
-    return `From KES ${Math.min(...prices).toLocaleString()}`;
+    return `From Ksh ${Math.min(...prices).toLocaleString()}`;
 }
 
 function openEdit(s: Service) {
+    const imgs: string[] = Array.isArray(s.images) && s.images.filter(Boolean).length
+        ? s.images.filter(Boolean)
+        : (s.image_url ? [s.image_url] : []);
     editing.value = {
         ...s,
         features: Array.isArray(s.features)
             ? s.features.join("\n")
             : (s.features ?? ""),
         sub_services: normalizeSubServices(s.sub_services as any ?? []),
+        images: imgs,
     };
     showModal.value = true;
 }
@@ -185,7 +208,15 @@ async function submit() {
                 : (editing.value.features ?? []);
         const rawSubs = (editing.value.sub_services ?? []).map(s => toRaw(s));
         const autoPrice = computeStartingPrice();
-        const payload = { ...editing.value, features: featuresArr, sub_services: rawSubs, starting_price: autoPrice };
+        const cleanImages = (editing.value.images ?? []).filter(Boolean);
+        const payload = {
+            ...editing.value,
+            features: featuresArr,
+            sub_services: rawSubs,
+            starting_price: autoPrice,
+            images: cleanImages,
+            image_url: cleanImages[0] ?? '',
+        };
         if (editing.value.id) {
             await api.patch(`/services/${editing.value.id}`, payload as any);
             toast.add("Service updated.");
@@ -295,6 +326,10 @@ onMounted(load);
                             />
                         </svg>
                     </div>
+                    <span v-if="(service.images?.filter(Boolean).length ?? 0) > 1"
+                          class="absolute bottom-3 right-3 bg-white/90 text-gray-700 text-[10px] font-bold rounded-full px-2 py-0.5 shadow">
+                        {{ service.images!.filter(Boolean).length }} photos
+                    </span>
                     <!-- Eye toggle -->
                     <button
                         @click="toggleVisible(service)"
@@ -475,13 +510,6 @@ onMounted(load);
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <ImageUpload
-                                        v-model="editing.image_url"
-                                        label="Service Image"
-                                        height="h-36"
-                                    />
-                                </div>
-                                <div>
                                     <label
                                         class="block text-xs font-semibold text-gray-600 mb-1.5"
                                         >Icon Keyword</label
@@ -491,6 +519,69 @@ onMounted(load);
                                         placeholder="e.g. palette"
                                         class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
                                     />
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-semibold text-gray-600 mb-1.5"
+                                        >Starting Price
+                                        <span v-if="hasAutoPrice()" class="text-gray-400 font-normal">(auto — lowest sub-service price)</span>
+                                    </label>
+                                    <input
+                                        v-model="editing.starting_price"
+                                        :disabled="hasAutoPrice()"
+                                        :class="hasAutoPrice() ? 'bg-gray-50 text-gray-500' : ''"
+                                        placeholder="e.g. From Ksh 5,000, or Custom Quote"
+                                        class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all disabled:cursor-not-allowed"
+                                    />
+                                    <p v-if="hasAutoPrice()" class="mt-1 text-[11px] text-gray-400">
+                                        Calculated from sub-service prices below. Remove all sub-service prices to set this manually.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Multi-image upload -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-xs font-semibold text-gray-600">
+                                        Service Images
+                                        <span class="ml-1 text-gray-400 font-normal">(first = primary, shown in hero &amp; listings)</span>
+                                    </label>
+                                    <button type="button" @click="addImageSlot"
+                                            class="inline-flex items-center gap-1 text-xs font-semibold text-cyan-600 hover:text-cyan-700">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                        Add Image
+                                    </button>
+                                </div>
+
+                                <div v-if="!editing.images?.length"
+                                     class="rounded-xl border-2 border-dashed border-gray-200 py-8 text-center">
+                                    <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <p class="text-xs text-gray-400">No images yet.</p>
+                                    <button type="button" @click="addImageSlot"
+                                            class="mt-2 text-xs font-medium text-cyan-600">
+                                        + Add first image
+                                    </button>
+                                </div>
+
+                                <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    <div v-for="(img, idx) in editing.images" :key="idx" class="relative">
+                                        <div class="absolute -top-1.5 left-1 z-10">
+                                            <span class="rounded-full bg-white border border-gray-200 px-1.5 py-0.5 text-[9px] font-bold text-gray-500 leading-none shadow-sm">
+                                                {{ idx === 0 ? 'Primary' : `#${idx + 1}` }}
+                                            </span>
+                                        </div>
+                                        <ImageUpload
+                                            :modelValue="img"
+                                            @update:modelValue="(url: string) => { if (editing.images) editing.images[idx] = url }"
+                                            height="h-28"
+                                        />
+                                        <button type="button" @click="removeImage(idx)"
+                                                class="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 leading-none">
+                                            ×
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -532,8 +623,8 @@ onMounted(load);
                                     <div class="flex gap-2">
                                         <select v-model="sub.price_type" class="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 w-36">
                                             <option value="">No price</option>
-                                            <option value="fixed">Fixed (KES X)</option>
-                                            <option value="from">From (From KES X)</option>
+                                            <option value="fixed">Fixed (Ksh X)</option>
+                                            <option value="from">From (From Ksh X)</option>
                                         </select>
                                         <input
                                             v-if="sub.price_type"

@@ -10,6 +10,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class SiteController extends Controller
 {
@@ -121,22 +122,28 @@ class SiteController extends Controller
             'preferred_date' => ['nullable', 'date'],
             'budget'         => ['nullable', 'string', 'max:80'],
             'message'        => ['required', 'string', 'max:1500'],
+            'artwork'        => ['nullable', 'file', 'max:10240'],
         ]);
 
         $subServiceLabel = !empty($validated['sub_service'])
             ? "{$validated['service']} — {$validated['sub_service']}"
             : $validated['service'];
 
+        $artworkPath = $request->hasFile('artwork')
+            ? $request->file('artwork')->store('booking-artwork', 'public')
+            : null;
+
         if ($validated['request_type'] === 'quote') {
             // Quote requests go to quote_requests table; product field holds the service name
             $this->submissions->createQuoteRequest([
-                'name'    => $validated['name'],
-                'email'   => $validated['email'],
-                'phone'   => $validated['phone'],
-                'product' => $subServiceLabel,
-                'budget'  => $validated['budget'] ?? null,
-                'notes'   => $validated['message'],
-                'status'  => 'new',
+                'name'         => $validated['name'],
+                'email'        => $validated['email'],
+                'phone'        => $validated['phone'],
+                'product'      => $subServiceLabel,
+                'budget'       => $validated['budget'] ?? null,
+                'notes'        => $validated['message'],
+                'artwork_path' => $artworkPath,
+                'status'       => 'new',
             ]);
 
             $successMsg = 'Your quote request has been received. Our team will prepare a tailored estimate and contact you shortly.';
@@ -148,15 +155,16 @@ class SiteController extends Controller
             }
 
             $this->submissions->createServiceRequest([
-                'client'      => $validated['name'],
-                'email'       => $validated['email'],
-                'phone'       => $validated['phone'],
-                'service'     => $subServiceLabel,
-                'budget'      => $validated['budget'] ?? null,
-                'timeline'    => $validated['preferred_date'] ?? null,
-                'description' => $description,
-                'priority'    => 'medium',
-                'status'      => 'new',
+                'client'       => $validated['name'],
+                'email'        => $validated['email'],
+                'phone'        => $validated['phone'],
+                'service'      => $subServiceLabel,
+                'budget'       => $validated['budget'] ?? null,
+                'timeline'     => $validated['preferred_date'] ?? null,
+                'description'  => $description,
+                'artwork_path' => $artworkPath,
+                'priority'     => 'medium',
+                'status'       => 'new',
             ]);
 
             $successMsg = 'Your booking request has been received. Our team will confirm availability and next steps shortly.';
@@ -178,9 +186,13 @@ class SiteController extends Controller
     {
         $product = Product::where('slug', $slug)->where('is_visible', true)->firstOrFail();
 
+        $tierLabels = collect($product->price_tiers ?? [])->pluck('label')->filter()->values()->all();
+
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:1000'],
-            'finish' => ['nullable', 'string', 'max:120'],
+            'finish' => empty($tierLabels)
+                ? ['nullable', 'string', 'max:120']
+                : ['required', 'string', Rule::in($tierLabels)],
         ]);
 
         $cart = session('cart', []);
@@ -336,6 +348,7 @@ class SiteController extends Controller
             }
 
             $quantity = (int) $item['quantity'];
+            $unitPrice = $product->priceForTier($item['finish'] ?? null);
 
             return [
                 'key' => $key,
@@ -344,12 +357,12 @@ class SiteController extends Controller
                     'name' => $product->name,
                     'image' => $product->image_url,
                     'category' => $product->category?->name ?? '',
-                    'price' => $product->price,
+                    'price' => $unitPrice,
                     'unit' => $product->unit ?? '',
                 ],
                 'finish' => $item['finish'],
                 'quantity' => $quantity,
-                'line_total' => $product->price * $quantity,
+                'line_total' => $unitPrice * $quantity,
             ];
         })->filter()->values()->all();
     }

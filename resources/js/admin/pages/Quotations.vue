@@ -35,6 +35,7 @@ interface QuoteRequest {
     size?: string;
     delivery_method?: string;
     notes?: string;
+    artwork_path?: string | null;
     status: string;
     created_at: string;
 }
@@ -191,8 +192,8 @@ async function printQuotation() {
         <tr>
           <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;">${i.description}</td>
           <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;text-align:center;">${i.quantity}</td>
-          <td style="padding:9px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">KES ${Number(i.unit_price).toLocaleString()}</td>
-          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">KES ${Number(i.total).toLocaleString()}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
         </tr>`).join('');
 
     const html = `<!DOCTYPE html>
@@ -254,9 +255,9 @@ async function printQuotation() {
   <!-- Totals right-aligned -->
   <div style="display:flex;justify-content:flex-end;margin-top:6px;">
     <table style="width:260px;">
-      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">Subtotal</td><td style="padding:6px 14px;font-size:12px;text-align:right;">KES ${Number(q.subtotal).toLocaleString()}</td></tr>
-      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">VAT (16%)</td><td style="padding:6px 14px;font-size:12px;text-align:right;">KES ${Number(q.tax).toLocaleString()}</td></tr>
-      <tr style="background:#1F2937;"><td style="padding:9px 14px;color:#fff;font-weight:700;font-size:13px;">TOTAL</td><td style="padding:9px 14px;color:#00BCD4;font-weight:700;font-size:13px;text-align:right;">KES ${Number(q.total).toLocaleString()}</td></tr>
+      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">Subtotal</td><td style="padding:6px 14px;font-size:12px;text-align:right;">Ksh ${Number(q.subtotal).toLocaleString()}</td></tr>
+      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">VAT (16%)</td><td style="padding:6px 14px;font-size:12px;text-align:right;">Ksh ${Number(q.tax).toLocaleString()}</td></tr>
+      <tr style="background:#1F2937;"><td style="padding:9px 14px;color:#fff;font-weight:700;font-size:13px;">TOTAL</td><td style="padding:9px 14px;color:#00BCD4;font-weight:700;font-size:13px;text-align:right;">Ksh ${Number(q.total).toLocaleString()}</td></tr>
     </table>
   </div>
 
@@ -679,7 +680,7 @@ onMounted(async () => {
                                     <td
                                         class="px-6 py-4 text-sm font-medium text-gray-900"
                                     >
-                                        KES {{ fmt(q.total) }}
+                                        Ksh {{ fmt(q.total) }}
                                     </td>
                                     <td class="px-6 py-4">
                                         <select
@@ -929,6 +930,11 @@ onMounted(async () => {
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-700">
                                         {{ r.product ?? "-" }}
+                                        <a v-if="r.artwork_path" :href="`/storage/${r.artwork_path}`" target="_blank" rel="noopener"
+                                           class="mt-1 flex items-center gap-1 text-xs font-semibold text-cyan-600 hover:text-cyan-700 w-max">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                                            Artwork
+                                        </a>
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-700">
                                         <div v-if="r.quantity">
@@ -1173,7 +1179,7 @@ onMounted(async () => {
                                                 <td
                                                     class="px-3 py-1.5 text-xs font-semibold text-gray-800 text-right"
                                                 >
-                                                    KES
+                                                    Ksh
                                                     {{
                                                         (
                                                             item.qty *
@@ -1216,7 +1222,7 @@ onMounted(async () => {
                                     <div class="flex gap-12 text-gray-600">
                                         <span>Subtotal</span
                                         ><span
-                                            >KES
+                                            >Ksh
                                             {{
                                                 subtotal.toLocaleString()
                                             }}</span
@@ -1225,7 +1231,7 @@ onMounted(async () => {
                                     <div class="flex gap-12 text-gray-600">
                                         <span>VAT (16%)</span
                                         ><span
-                                            >KES
+                                            >Ksh
                                             {{ vat.toLocaleString() }}</span
                                         >
                                     </div>
@@ -1234,7 +1240,7 @@ onMounted(async () => {
                                     >
                                         <span>Total</span
                                         ><span
-                                            >KES
+                                            >Ksh
                                             {{ total.toLocaleString() }}</span
                                         >
                                     </div>
@@ -1260,7 +1266,7 @@ onMounted(async () => {
                             <p class="text-sm font-bold text-gray-900">
                                 Total:
                                 <span style="color: #00bcd4"
-                                    >KES {{ total.toLocaleString() }}</span
+                                    >Ksh {{ total.toLocaleString() }}</span
                                 >
                             </p>
                             <div class="flex gap-2">
@@ -1515,19 +1521,19 @@ onMounted(async () => {
                                     <div class="flex gap-16 text-gray-600">
                                         <span>Subtotal</span
                                         ><span
-                                            >KES {{ fmt(viewQ.subtotal) }}</span
+                                            >Ksh {{ fmt(viewQ.subtotal) }}</span
                                         >
                                     </div>
                                     <div class="flex gap-16 text-gray-600">
                                         <span>VAT (16%)</span
-                                        ><span>KES {{ fmt(viewQ.tax) }}</span>
+                                        ><span>Ksh {{ fmt(viewQ.tax) }}</span>
                                     </div>
                                     <div
                                         class="flex gap-12 font-bold text-gray-900 border-t border-gray-200 pt-1.5"
                                     >
                                         <span>Total</span
                                         ><span style="color: #00bcd4"
-                                            >KES {{ fmt(viewQ.total) }}</span
+                                            >Ksh {{ fmt(viewQ.total) }}</span
                                         >
                                     </div>
                                 </div>

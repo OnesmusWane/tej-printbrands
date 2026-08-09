@@ -18,7 +18,7 @@
                 @php($success = session('checkout_success'))
                 <div class="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-900 shadow-sm">
                     <h2 class="mb-2 text-2xl font-extrabold">Order request received: {{ $success['order_number'] }}</h2>
-                    <p class="text-sm">Estimated total: <strong>KES {{ number_format($success['totals']['total']) }}</strong>. Payment option: <strong>{{ strtoupper($success['payment_method']) }}</strong>. We will send the next payment and artwork confirmation steps to your account email.</p>
+                    <p class="text-sm">Estimated total: <strong>Ksh {{ number_format($success['totals']['total']) }}</strong>. Payment option: <strong>{{ strtoupper($success['payment_method']) }}</strong>. We will send the next payment and artwork confirmation steps to your account email.</p>
                     <a href="{{ route('products') }}" class="mt-5 inline-block rounded-lg bg-primary px-5 py-3 font-extrabold text-white transition hover:bg-dark-cyan">Continue Shopping</a>
                 </div>
             @elseif (count($cartItems) === 0)
@@ -86,16 +86,16 @@
                                     <div class="border-b border-slate-100 pb-4 text-sm">
                                         <div class="flex justify-between gap-4">
                                             <span class="font-bold text-slate-900">{{ $item['product']['name'] }}</span>
-                                            <span class="font-bold text-slate-900">KES {{ number_format($item['line_total']) }}</span>
+                                            <span class="font-bold text-slate-900">Ksh {{ number_format($item['line_total']) }}</span>
                                         </div>
                                         <p class="mt-1 text-slate-500">{{ $item['quantity'] }} x {{ $item['finish'] }}</p>
                                     </div>
                                 @endforeach
-                                <div class="flex justify-between text-sm"><span class="text-slate-600">Subtotal</span><span class="font-bold text-slate-900">KES {{ number_format($cartTotals['subtotal']) }}</span></div>
-                                <div class="flex justify-between text-sm"><span class="text-slate-600">Service handling</span><span class="font-bold text-slate-900">KES {{ number_format($cartTotals['service_fee']) }}</span></div>
+                                <div class="flex justify-between text-sm"><span class="text-slate-600">Subtotal</span><span class="font-bold text-slate-900">Ksh {{ number_format($cartTotals['subtotal']) }}</span></div>
+                                <div class="flex justify-between text-sm"><span class="text-slate-600">Service handling</span><span class="font-bold text-slate-900">Ksh {{ number_format($cartTotals['service_fee']) }}</span></div>
                                 <div class="border-t border-slate-200 pt-4">
                                     <span class="block text-sm text-slate-600">Estimated total</span>
-                                    <span class="text-3xl font-extrabold text-primary">KES {{ number_format($cartTotals['total']) }}</span>
+                                    <span class="text-3xl font-extrabold text-primary">Ksh {{ number_format($cartTotals['total']) }}</span>
                                 </div>
                             </div>
                         </div>

@@ -11,7 +11,7 @@ class ServiceRequest extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['request_number', 'client', 'email', 'phone', 'service', 'budget', 'timeline', 'priority', 'status', 'description'];
+    protected $fillable = ['request_number', 'client', 'email', 'phone', 'service', 'budget', 'timeline', 'priority', 'status', 'description', 'artwork_path'];
 
     public function quotations(): HasMany
     {

@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\AdminResourceRequest;
 use App\Models\BlogPost;
 use App\Models\Brand;
 use App\Models\ContactMessage;
+use App\Models\DailyLedgerEntry;
 use App\Models\Faq;
 use App\Models\GalleryItem;
 use App\Models\Invoice;
@@ -41,6 +42,7 @@ class AdminResourceController extends Controller
         'site-sections' => SiteSection::class,
         'site-settings' => SiteSetting::class,
         'services' => Service::class,
+        'daily-ledger-entries' => DailyLedgerEntry::class,
         'process-steps' => ProcessStep::class,
         'pricing-tiers' => PricingTier::class,
         'portfolio-projects' => PortfolioProject::class,
@@ -67,7 +69,7 @@ class AdminResourceController extends Controller
     {
         $query = $this->model($resource)::query();
 
-        foreach (['status', 'category', 'is_visible'] as $filter) {
+        foreach (['status', 'category', 'is_visible', 'type'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }
@@ -78,7 +80,13 @@ class AdminResourceController extends Controller
 
     public function store(AdminResourceRequest $request, string $resource): JsonResponse
     {
-        $model = $this->model($resource)::create($request->validated());
+        $data = $request->validated();
+
+        if ($resource === 'daily-ledger-entries') {
+            $data['recorded_by'] = $request->user()->id;
+        }
+
+        $model = $this->model($resource)::create($data);
 
         return response()->json($model, 201);
     }

@@ -168,10 +168,16 @@
 
                         {{-- ── Product info ────────────────────────────────────── --}}
                         <div class="p-6">
+                            @php
+                                $tiers = is_array($product['price_tiers'] ?? null)
+                                    ? array_values(array_filter($product['price_tiers'], fn($t) => is_array($t) && !empty($t['label']) && isset($t['price'])))
+                                    : [];
+                                $hasTiers = !empty($tiers);
+                            @endphp
                             <h3 class="mb-3 text-xl font-extrabold text-slate-900">{{ $product['name'] }}</h3>
                             <p class="mb-5 text-sm leading-relaxed text-slate-600">{{ $product['description'] }}</p>
                             <div class="mb-5">
-                                <span class="text-3xl font-extrabold text-primary">KES {{ number_format($product['price']) }}</span>
+                                <span id="price-{{ $product['slug'] }}" class="text-3xl font-extrabold text-primary">{{ $hasTiers ? 'From ' : '' }}Ksh {{ number_format($product['price']) }}</span>
                                 <span class="block text-sm text-slate-500">{{ $product['unit'] }}</span>
                             </div>
                             <ul class="mb-6 space-y-2 text-sm text-slate-700">
@@ -182,11 +188,20 @@
                             <form action="{{ route('cart.add', $product['slug']) }}" method="post" class="space-y-3">
                                 @csrf
                                 @php $hasFinishes = !empty($product['finishes']); @endphp
-                                <div class="{{ $hasFinishes ? 'grid grid-cols-[80px_1fr] gap-3' : '' }}">
+                                <div class="{{ $hasTiers || $hasFinishes ? 'grid grid-cols-[80px_1fr] gap-3' : '' }}">
                                     <label class="text-xs font-bold text-slate-600">Qty
                                         <input type="number" min="1" max="1000" name="quantity" value="1" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                                     </label>
-                                    @if ($hasFinishes)
+                                    @if ($hasTiers)
+                                        <label class="text-xs font-bold text-slate-600">Size
+                                            <select name="finish" required onchange="updateTierPrice(this, '{{ $product['slug'] }}')" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                                <option value="" disabled selected>Choose a size</option>
+                                                @foreach ($tiers as $tier)
+                                                    <option value="{{ $tier['label'] }}" data-price="{{ $tier['price'] }}">{{ $tier['label'] }} — Ksh {{ number_format($tier['price']) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                    @elseif ($hasFinishes)
                                         <label class="text-xs font-bold text-slate-600">Finish
                                             <select name="finish" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                                                 @foreach ($product['finishes'] as $finish)
@@ -206,6 +221,18 @@
             </div>
         </div>
     </section>
+
+    {{-- Tier price display --}}
+    <script>
+    window.updateTierPrice = function (select, slug) {
+        var option = select.options[select.selectedIndex];
+        var price = option ? option.getAttribute('data-price') : null;
+        var display = document.getElementById('price-' + slug);
+        if (display && price) {
+            display.textContent = 'Ksh ' + Number(price).toLocaleString();
+        }
+    };
+    </script>
 
     {{-- Lightbox --}}
     <script>

@@ -254,7 +254,7 @@ onMounted(load)
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1.5">Currency</label>
                             <select v-model="business.currency" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all bg-white">
-                                <option value="KES">KES – Kenyan Shilling</option>
+                                <option value="KES">Ksh – Kenyan Shilling</option>
                                 <option value="USD">USD – US Dollar</option>
                             </select>
                         </div>

@@ -185,7 +185,7 @@ const setupCheckoutSummary = () => {
 
     const render = () => {
         const amount = Math.max(Number(quantity.value || 1), 1) * unitPrice;
-        total.textContent = `KES ${formatter.format(amount)}`;
+        total.textContent = `Ksh ${formatter.format(amount)}`;
     };
 
     quantity.addEventListener('input', render);

@@ -12,7 +12,7 @@
                     @forelse ($orders as $order)
                         <a href="{{ route('account.orders.show', $order) }}" class="grid gap-3 rounded-xl border border-slate-100 p-5 transition hover:bg-slate-50 md:grid-cols-[1fr_auto]">
                             <div><h2 class="font-extrabold text-slate-900">{{ $order->order_number }}</h2><p class="mt-1 text-sm text-slate-500">{{ $order->created_at->format('M d, Y') }} · {{ str_replace('_', ' ', $order->status) }} · {{ strtoupper($order->payment_method) }}</p></div>
-                            <div class="font-extrabold text-primary">KES {{ number_format($order->total) }}</div>
+                            <div class="font-extrabold text-primary">Ksh {{ number_format($order->total) }}</div>
                         </a>
                     @empty
                         <p class="text-slate-600">No purchases yet.</p>

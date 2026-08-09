@@ -729,7 +729,7 @@ onMounted(async () => {
                                 >
                                     {{
                                         booking.price
-                                            ? "KES " +
+                                            ? "Ksh " +
                                               Number(
                                                   booking.price,
                                               ).toLocaleString()
@@ -976,7 +976,7 @@ onMounted(async () => {
                             <div>
                                 <label
                                     class="block text-sm font-medium text-gray-700 mb-1"
-                                    >Amount (KES)
+                                    >Amount (Ksh)
                                     <span class="text-red-500">*</span></label
                                 >
                                 <input
@@ -1123,7 +1123,7 @@ onMounted(async () => {
                             class="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3"
                         >
                             <p class="text-sm font-bold text-gray-900">
-                                KES
+                                Ksh
                                 <span style="color: #00bcd4">{{
                                     payAmount.toLocaleString()
                                 }}</span>
@@ -1314,7 +1314,7 @@ onMounted(async () => {
                                 <div>
                                     <label
                                         class="block text-sm font-medium text-gray-700 mb-1"
-                                        >Agreed Price (KES)</label
+                                        >Agreed Price (Ksh)</label
                                     >
                                     <input
                                         v-model.number="newForm.price"

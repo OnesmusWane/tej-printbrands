@@ -16,7 +16,7 @@
                 </div>
                 <div class="rounded-2xl bg-white p-6 shadow-sm">
                     <div class="mb-5 flex items-center justify-between"><h2 class="text-2xl font-extrabold text-slate-900">Recent Purchases</h2><a href="{{ route('account.orders') }}" class="text-sm font-bold text-primary">View all</a></div>
-                    <div class="space-y-3">@forelse ($orders as $order)<a href="{{ route('account.orders.show', $order) }}" class="flex justify-between rounded-lg border border-slate-100 p-4 hover:bg-slate-50"><span class="font-bold text-slate-900">{{ $order->order_number }}</span><span class="text-sm text-slate-600">KES {{ number_format($order->total) }}</span></a>@empty<p class="text-slate-600">No purchases yet.</p>@endforelse</div>
+                    <div class="space-y-3">@forelse ($orders as $order)<a href="{{ route('account.orders.show', $order) }}" class="flex justify-between rounded-lg border border-slate-100 p-4 hover:bg-slate-50"><span class="font-bold text-slate-900">{{ $order->order_number }}</span><span class="text-sm text-slate-600">Ksh {{ number_format($order->total) }}</span></a>@empty<p class="text-slate-600">No purchases yet.</p>@endforelse</div>
                 </div>
             </div>
         </div>

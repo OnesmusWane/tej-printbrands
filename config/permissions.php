@@ -9,6 +9,7 @@ return [
         'invoices.view' => 'View Invoices',    'invoices.edit' => 'Manage Invoices',
         'payments.view' => 'View Payments',    'payments.edit' => 'Manage Payments',
         'orders.view'   => 'View Orders',      'orders.edit'   => 'Manage Orders',
+        'daily_ledger.view' => 'View Daily Sales & Expenses', 'daily_ledger.edit' => 'Manage Daily Sales & Expenses',
     ],
     'Content'   => [
         'content.view' => 'View Content',      'content.edit' => 'Manage Content',

@@ -12,6 +12,7 @@ interface Order { id: number; order_number: string; client: string; email: strin
 interface Act   { text: string; time: string; color: string }
 interface Prod  { id: number; name: string; price: number; unit: string; slug: string }
 interface Client { id: number; name: string; email: string; phone: string }
+interface LedgerSummary { sales: number; expenses: number; net: number }
 
 // ─── dashboard state ─────────────────────────────────────────────────────────
 const loading       = ref(true)
@@ -19,6 +20,12 @@ const kpis          = ref<Kpi[]>([])
 const chartData     = ref<Bar[]>([])
 const recentOrders  = ref<Order[]>([])
 const recentActivity = ref<Act[]>([])
+const dailyLedger   = ref<{ today: LedgerSummary; this_month: LedgerSummary }>({
+  today: { sales: 0, expenses: 0, net: 0 },
+  this_month: { sales: 0, expenses: 0, net: 0 },
+})
+
+function fmtKsh(n: number): string { return 'Ksh ' + Number(n).toLocaleString() }
 
 // ─── status helpers ───────────────────────────────────────────────────────────
 const statusStyle: Record<string, string> = {
@@ -86,6 +93,7 @@ async function loadDashboard() {
     chartData.value      = data.chart ?? []
     recentOrders.value   = data.recent_orders ?? []
     recentActivity.value = data.recent_activity ?? []
+    dailyLedger.value    = data.daily_ledger ?? dailyLedger.value
   } finally {
     loading.value = false
   }
@@ -227,7 +235,7 @@ onMounted(loadDashboard)
           <div class="flex items-center justify-between mb-6">
             <div>
               <h2 class="text-base font-semibold text-gray-900">Revenue vs Expenses</h2>
-              <p class="text-xs text-gray-500 mt-0.5">In thousands KES · Last 6 months</p>
+              <p class="text-xs text-gray-500 mt-0.5">In thousands Ksh · Last 6 months</p>
             </div>
             <div class="flex items-center gap-4 text-xs text-gray-500">
               <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:#06b6d4;"></span>Revenue</span>
@@ -273,6 +281,33 @@ onMounted(loadDashboard)
               </span>
               <span class="font-semibold text-gray-800">{{ d.pct }}%</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily Sales & Expenses -->
+      <div v-if="auth.can('daily_ledger.view')" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-base font-semibold text-gray-900">Today's Sales &amp; Expenses</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Manually logged cash sales and expenses for today</p>
+          </div>
+          <router-link to="/daily-ledger" class="text-xs font-semibold text-cyan-600 hover:text-cyan-700 whitespace-nowrap">
+            Log entry / View all →
+          </router-link>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="rounded-xl bg-green-50 border border-green-100 p-4">
+            <p class="text-xs font-semibold text-green-700 uppercase tracking-wider mb-1">Sales</p>
+            <p class="text-xl font-bold text-green-700">{{ fmtKsh(dailyLedger.today.sales) }}</p>
+          </div>
+          <div class="rounded-xl bg-red-50 border border-red-100 p-4">
+            <p class="text-xs font-semibold text-red-600 uppercase tracking-wider mb-1">Expenses</p>
+            <p class="text-xl font-bold text-red-600">{{ fmtKsh(dailyLedger.today.expenses) }}</p>
+          </div>
+          <div class="rounded-xl bg-gray-50 border border-gray-100 p-4">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Net</p>
+            <p class="text-xl font-bold" :class="dailyLedger.today.net >= 0 ? 'text-gray-900' : 'text-red-600'">{{ fmtKsh(dailyLedger.today.net) }}</p>
           </div>
         </div>
       </div>
@@ -428,7 +463,7 @@ onMounted(loadDashboard)
                             class="w-full border border-gray-300 rounded-lg px-2 py-2 text-xs outline-none focus:border-cyan-500 transition-all">
                         </td>
                         <td class="px-3 py-2 text-right font-semibold text-gray-800 text-xs">
-                          KES {{ (item.unit_price * item.quantity).toLocaleString() }}
+                          Ksh {{ (item.unit_price * item.quantity).toLocaleString() }}
                         </td>
                         <td class="px-2 py-2">
                           <button type="button" @click="removeItem(idx)" v-if="form.items.length > 1"
@@ -444,7 +479,7 @@ onMounted(loadDashboard)
                 <div class="mt-3 flex flex-col items-end gap-1 text-sm">
                   <div class="flex gap-12 text-gray-600">
                     <span>Subtotal</span>
-                    <span class="font-medium">KES {{ subtotal.toLocaleString() }}</span>
+                    <span class="font-medium">Ksh {{ subtotal.toLocaleString() }}</span>
                   </div>
                   <div class="flex gap-8 text-gray-600 items-center">
                     <span>Service Fee</span>
@@ -453,7 +488,7 @@ onMounted(loadDashboard)
                   </div>
                   <div class="flex gap-8 font-bold text-gray-900 border-t border-gray-200 pt-1 mt-1">
                     <span>Total</span>
-                    <span>KES {{ grandTotal.toLocaleString() }}</span>
+                    <span>Ksh {{ grandTotal.toLocaleString() }}</span>
                   </div>
                 </div>
               </div>
@@ -522,7 +557,7 @@ onMounted(loadDashboard)
 
             <!-- Modal Footer -->
             <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-between gap-3 shrink-0">
-              <p class="text-sm font-bold text-gray-900">Total: <span style="color:#00BCD4;">KES {{ grandTotal.toLocaleString() }}</span></p>
+              <p class="text-sm font-bold text-gray-900">Total: <span style="color:#00BCD4;">Ksh {{ grandTotal.toLocaleString() }}</span></p>
               <div class="flex gap-3">
                 <button type="button" @click="showModal = false"
                   class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">

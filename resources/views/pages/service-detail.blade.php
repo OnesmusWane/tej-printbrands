@@ -32,12 +32,15 @@
 
 @section('content')
     @php
-        $features    = is_array($service->features) ? $service->features : (json_decode($service->features ?? '[]', true) ?? []);
-        $subServices = is_array($service->sub_services) ? $service->sub_services : (json_decode($service->sub_services ?? '[]', true) ?? []);
+        $features     = is_array($service->features) ? $service->features : (json_decode($service->features ?? '[]', true) ?? []);
+        $subServices  = is_array($service->sub_services) ? $service->sub_services : (json_decode($service->sub_services ?? '[]', true) ?? []);
+        $serviceImages = is_array($service->images) && !empty(array_filter($service->images))
+            ? array_values(array_filter($service->images, fn($u) => is_string($u) && $u !== ''))
+            : ($service->image_url ? [$service->image_url] : []);
 
         $priceBadge = function(?string $type, $price): ?string {
             if (!$type || !$price) return null;
-            $f = 'KES ' . number_format((float) $price);
+            $f = 'Ksh ' . number_format((float) $price);
             return $type === 'from' ? 'From ' . $f : $f;
         };
     @endphp
@@ -69,6 +72,42 @@
                         <h2 class="mb-5 text-3xl font-extrabold text-slate-900">Overview</h2>
                         <p class="text-lg leading-relaxed text-slate-600">{{ $service->description }}</p>
                     </section>
+
+                    @if (!empty($serviceImages))
+                    <section id="service-gallery">
+                        <div class="relative aspect-4/3 overflow-hidden rounded-2xl border border-slate-100 bg-slate-100 shadow-sm sm:aspect-video">
+                            @foreach ($serviceImages as $i => $img)
+                                <div
+                                    class="gallery-main-slide absolute inset-0 cursor-zoom-in {{ $i === 0 ? '' : 'hidden' }}"
+                                    data-gallery-index="{{ $i }}"
+                                    onclick="openLightbox('{{ addslashes($img) }}', '{{ addslashes($service->title) }}')"
+                                    title="Click to enlarge"
+                                >
+                                    <x-responsive-image :src="$img" :alt="$service->title" variant="hero" sizes="(min-width: 1024px) 60vw, 100vw" :eager="$i === 0" class="h-full w-full object-cover" />
+                                </div>
+                            @endforeach
+                            @if (count($serviceImages) > 1)
+                                <div class="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white">
+                                    <span id="gallery-counter">1</span> / {{ count($serviceImages) }}
+                                </div>
+                            @endif
+                        </div>
+                        @if (count($serviceImages) > 1)
+                            <div class="mt-3 flex gap-3 overflow-x-auto pb-1">
+                                @foreach ($serviceImages as $i => $img)
+                                    <button
+                                        type="button"
+                                        class="gallery-thumb-btn h-20 w-20 shrink-0 overflow-hidden rounded-xl border-2 transition-colors {{ $i === 0 ? 'border-cyan' : 'border-transparent' }}"
+                                        data-gallery-index="{{ $i }}"
+                                        onclick="showGalleryImage({{ $i }})"
+                                    >
+                                        <x-responsive-image :src="$img" :alt="$service->title" variant="thumb" sizes="80px" class="h-full w-full object-cover" />
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </section>
+                    @endif
 
                     @if (!empty($subServices))
                     <section id="sub-services-section">
@@ -106,7 +145,7 @@
                                         }
                                     }
                                     $displayPriceStr = !empty($nestedPrices)
-                                        ? 'From KES ' . number_format(min($nestedPrices))
+                                        ? 'From Ksh ' . number_format(min($nestedPrices))
                                         : $subPriceStr;
                                     // Build searchable terms: parent title + all nested titles
                                     $searchTerms = strtolower($subTitle);
@@ -317,6 +356,20 @@
                 if (empty) empty.classList.toggle('hidden', visible > 0);
             });
         }
+
+        /* ── Main service gallery ── */
+        window.showGalleryImage = function (index) {
+            document.querySelectorAll('.gallery-main-slide').forEach(function (slide) {
+                slide.classList.toggle('hidden', slide.getAttribute('data-gallery-index') !== String(index));
+            });
+            document.querySelectorAll('.gallery-thumb-btn').forEach(function (btn) {
+                var active = btn.getAttribute('data-gallery-index') === String(index);
+                btn.classList.toggle('border-cyan', active);
+                btn.classList.toggle('border-transparent', !active);
+            });
+            var counter = document.getElementById('gallery-counter');
+            if (counter) counter.textContent = String(index + 1);
+        };
 
         /* ── Lightbox ── */
         window.openLightbox = function (src, alt) {

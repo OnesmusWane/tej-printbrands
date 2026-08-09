@@ -3,19 +3,21 @@ import { ref, onMounted } from 'vue'
 import { useResource } from '../composables/useResource'
 import ImageUpload from '../components/ImageUpload.vue'
 
+interface PriceTier { label: string; price: number | null }
+
 interface Product {
-    id: number; slug: string; name: string; price: number; unit: string
+    id: number; slug: string; name: string; price: number; price_tiers?: PriceTier[]; unit: string
     description: string; image_url: string; images: string[]; features: string[]
     is_visible: boolean; sort_order: number; stock_quantity: number | null
 }
 
 const { items, loading, saving, load, save, remove } = useResource<Product>('products')
 const showModal  = ref(false)
-const editing    = ref<Partial<Product> & { images: string[] }>({ images: [] })
+const editing    = ref<Partial<Product> & { images: string[]; price_tiers: PriceTier[] }>({ images: [], price_tiers: [] })
 const trackStock = ref(false)
 
 function openNew() {
-    editing.value  = { is_visible: true, features: [], sort_order: 0, price: 0, stock_quantity: null, images: [] }
+    editing.value  = { is_visible: true, features: [], sort_order: 0, price: 0, stock_quantity: null, images: [], price_tiers: [] }
     trackStock.value = false
     showModal.value = true
 }
@@ -24,9 +26,25 @@ function openEdit(p: Product) {
     const imgs: string[] = Array.isArray(p.images) && p.images.filter(Boolean).length
         ? p.images.filter(Boolean)
         : (p.image_url ? [p.image_url] : [])
-    editing.value    = { ...p, images: imgs }
+    const tiers: PriceTier[] = Array.isArray(p.price_tiers) ? p.price_tiers.filter(t => t && t.label) : []
+    editing.value    = { ...p, images: imgs, price_tiers: tiers }
     trackStock.value = p.stock_quantity !== null && p.stock_quantity !== undefined
     showModal.value  = true
+}
+
+function addTier() {
+    editing.value.price_tiers.push({ label: '', price: null })
+}
+
+function removeTier(idx: number) {
+    editing.value.price_tiers.splice(idx, 1)
+}
+
+function lowestTierPrice(): number | null {
+    const prices = editing.value.price_tiers
+        .filter(t => t.label && t.price != null && Number(t.price) > 0)
+        .map(t => Number(t.price))
+    return prices.length ? Math.min(...prices) : null
 }
 
 function addImageSlot() {
@@ -39,11 +57,16 @@ function removeImage(idx: number) {
 
 async function submit() {
     const cleanImages = editing.value.images.filter(Boolean)
+    const cleanTiers  = editing.value.price_tiers
+        .filter(t => t.label && t.price != null && t.price !== ('' as any))
+        .map(t => ({ label: t.label.trim(), price: Number(t.price) }))
+    const lowest = cleanTiers.length ? Math.min(...cleanTiers.map(t => t.price)) : null
     const payload = {
         ...editing.value,
         images:         cleanImages,
         image_url:      cleanImages[0] ?? '',
-        price:          Number(editing.value.price),
+        price_tiers:    cleanTiers,
+        price:          lowest ?? Number(editing.value.price),
         stock_quantity: trackStock.value ? (Number(editing.value.stock_quantity) || 0) : null,
         features: typeof editing.value.features === 'string'
             ? (editing.value.features as any as string).split('\n').map((f: string) => f.trim()).filter(Boolean)
@@ -119,7 +142,10 @@ onMounted(() => load())
                                 <span class="font-semibold text-gray-900">{{ p.name }}</span>
                             </div>
                         </td>
-                        <td class="px-4 py-3 font-bold" style="color:#00bcd4">KES {{ Number(p.price).toLocaleString() }}</td>
+                        <td class="px-4 py-3 font-bold" style="color:#00bcd4">
+                            <span v-if="p.price_tiers?.length">From Ksh {{ Number(p.price).toLocaleString() }}</span>
+                            <span v-else>Ksh {{ Number(p.price).toLocaleString() }}</span>
+                        </td>
                         <td class="px-4 py-3 text-gray-500">{{ p.unit }}</td>
                         <td class="px-4 py-3">
                             <span :class="['text-sm font-semibold', stockClass(p)]">{{ stockLabel(p) }}</span>
@@ -166,15 +192,60 @@ onMounted(() => load())
                                            class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Price (KES)</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Price (Ksh)
+                                        <span v-if="editing.price_tiers.length" class="ml-1 text-gray-400 font-normal text-xs">(auto — lowest tier)</span>
+                                    </label>
                                     <input type="number" v-model.number="editing.price" required min="0"
-                                           class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                                           :disabled="editing.price_tiers.length > 0"
+                                           :class="editing.price_tiers.length ? 'bg-gray-50 text-gray-500' : ''"
+                                           class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all disabled:cursor-not-allowed">
                                 </div>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Unit / pricing note</label>
                                 <input v-model="editing.unit" placeholder="per 100 cards"
                                        class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                            </div>
+
+                            <!-- Price tiers (e.g. sizes with different prices) -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-sm font-medium text-gray-700">
+                                        Price Tiers
+                                        <span class="ml-1 text-gray-400 font-normal text-xs">(optional — e.g. A6 / A5 / A4 at different prices)</span>
+                                    </label>
+                                    <button type="button" @click="addTier"
+                                            class="text-xs font-medium flex items-center gap-1"
+                                            style="color:#00bcd4">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                        Add Tier
+                                    </button>
+                                </div>
+
+                                <p v-if="!editing.price_tiers.length" class="text-xs text-gray-400">
+                                    No tiers — customers will just see the single price above.
+                                </p>
+
+                                <div v-else class="space-y-2">
+                                    <div v-for="(tier, idx) in editing.price_tiers" :key="idx" class="flex items-center gap-2">
+                                        <input v-model="tier.label" placeholder="e.g. A6" required
+                                               class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20">
+                                        <div class="relative flex-1">
+                                            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Ksh</span>
+                                            <input type="number" v-model.number="tier.price" min="0" placeholder="0" required
+                                                   class="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20">
+                                        </div>
+                                        <button type="button" @click="removeTier(idx)" class="text-red-400 hover:text-red-600 p-1 shrink-0">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
+                                    <p v-if="lowestTierPrice() !== null" class="text-xs text-gray-400">
+                                        Storefront will show "From Ksh {{ lowestTierPrice()!.toLocaleString() }}" until a customer picks a tier.
+                                    </p>
+                                </div>
                             </div>
 
                             <!-- Multi-image upload -->

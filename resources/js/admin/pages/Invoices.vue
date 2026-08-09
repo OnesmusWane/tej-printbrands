@@ -117,8 +117,8 @@ async function printInvoice() {
       <tr>
         <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;">${i.description}</td>
         <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:center;">${i.quantity}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;">KES ${Number(i.unit_price).toLocaleString()}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">KES ${Number(i.total).toLocaleString()}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
       </tr>`).join('')
     : `<tr><td colspan="4" style="padding:16px;text-align:center;color:#9CA3AF;font-style:italic;">${q?.service ?? 'Professional services'}</td></tr>`
 
@@ -127,7 +127,7 @@ async function printInvoice() {
       <td style="padding:6px 10px;font-size:12px;">${p.payment_number}</td>
       <td style="padding:6px 10px;font-size:12px;text-transform:capitalize;">${p.method}</td>
       <td style="padding:6px 10px;font-size:12px;font-family:monospace;">${p.reference ?? '-'}</td>
-      <td style="padding:6px 10px;font-size:12px;text-align:right;">KES ${Number(p.amount).toLocaleString()}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">Ksh ${Number(p.amount).toLocaleString()}</td>
       <td style="padding:6px 10px;font-size:12px;">${p.paid_at ? fd(p.paid_at) : '-'}</td>
     </tr>`).join('')
 
@@ -196,9 +196,9 @@ table{width:100%;border-collapse:collapse}
   <!-- Totals -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
     <table style="width:260px;">
-      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;">Amount</td><td style="padding:7px 14px;font-size:13px;text-align:right;">KES ${Number(inv.amount).toLocaleString()}</td></tr>
-      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;color:#16a34a;">Paid</td><td style="padding:7px 14px;font-size:13px;text-align:right;color:#16a34a;">KES ${Number(inv.paid_amount ?? 0).toLocaleString()}</td></tr>
-      <tr style="background:#1F2937;color:#fff;font-weight:700;"><td style="padding:10px 14px;">Balance Due</td><td style="padding:10px 14px;text-align:right;color:#00BCD4;">KES ${balanceDue.toLocaleString()}</td></tr>
+      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;">Amount</td><td style="padding:7px 14px;font-size:13px;text-align:right;">Ksh ${Number(inv.amount).toLocaleString()}</td></tr>
+      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;color:#16a34a;">Paid</td><td style="padding:7px 14px;font-size:13px;text-align:right;color:#16a34a;">Ksh ${Number(inv.paid_amount ?? 0).toLocaleString()}</td></tr>
+      <tr style="background:#1F2937;color:#fff;font-weight:700;"><td style="padding:10px 14px;">Balance Due</td><td style="padding:10px 14px;text-align:right;color:#00BCD4;">Ksh ${balanceDue.toLocaleString()}</td></tr>
     </table>
   </div>
 
@@ -401,8 +401,8 @@ onMounted(async () => {
                   <div class="text-sm font-semibold text-gray-900">{{ inv.client }}</div>
                   <div class="text-xs text-gray-500">{{ inv.email }}</div>
                 </td>
-                <td class="px-6 py-4 text-sm font-medium text-gray-900">KES {{ fmt(inv.amount) }}</td>
-                <td class="px-6 py-4 text-sm text-green-600 font-medium">KES {{ fmt(inv.paid_amount ?? 0) }}</td>
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">Ksh {{ fmt(inv.amount) }}</td>
+                <td class="px-6 py-4 text-sm text-green-600 font-medium">Ksh {{ fmt(inv.paid_amount ?? 0) }}</td>
                 <td class="px-6 py-4">
                   <select :value="inv.status"
                     @change="updateInvoiceStatus(inv, ($event.target as HTMLSelectElement).value)"
@@ -455,7 +455,7 @@ onMounted(async () => {
                 <select v-model.number="form.quotation_id" @change="onQuotationSelect"
                   class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 bg-white transition-all">
                   <option :value="0">None — enter client manually</option>
-                  <option v-for="q in quotations" :key="q.id" :value="q.id">{{ q.quote_number }} · {{ q.client }} · KES {{ fmt(q.total) }}</option>
+                  <option v-for="q in quotations" :key="q.id" :value="q.id">{{ q.quote_number }} · {{ q.client }} · Ksh {{ fmt(q.total) }}</option>
                 </select>
               </div>
 
@@ -471,7 +471,7 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (KES) <span class="text-red-500">*</span></label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh) <span class="text-red-500">*</span></label>
                   <input v-model.number="form.amount" type="number" min="1" placeholder="0"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
@@ -573,16 +573,16 @@ onMounted(async () => {
                       <tr v-for="item in viewInv.quotation.items" :key="item.id">
                         <td class="px-4 py-2.5 text-gray-700">{{ item.description }}</td>
                         <td class="px-4 py-2.5 text-center text-gray-700">{{ item.quantity }}</td>
-                        <td class="px-4 py-2.5 text-right font-medium text-gray-900">KES {{ fmt(item.total) }}</td>
+                        <td class="px-4 py-2.5 text-right font-medium text-gray-900">Ksh {{ fmt(item.total) }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <!-- Totals -->
                 <div class="flex flex-col items-end gap-1.5 text-sm mb-4">
-                  <div class="flex gap-12 text-gray-600"><span>Invoice Amount</span><span>KES {{ fmt(viewInv.amount) }}</span></div>
-                  <div class="flex gap-12 text-green-600"><span>Amount Paid</span><span>KES {{ fmt(viewInv.paid_amount ?? 0) }}</span></div>
-                  <div class="flex gap-10 font-bold text-gray-900 border-t border-gray-200 pt-1.5"><span>Balance Due</span><span style="color:#00BCD4;">KES {{ fmt(Math.max(0, viewInv.amount - (viewInv.paid_amount ?? 0))) }}</span></div>
+                  <div class="flex gap-12 text-gray-600"><span>Invoice Amount</span><span>Ksh {{ fmt(viewInv.amount) }}</span></div>
+                  <div class="flex gap-12 text-green-600"><span>Amount Paid</span><span>Ksh {{ fmt(viewInv.paid_amount ?? 0) }}</span></div>
+                  <div class="flex gap-10 font-bold text-gray-900 border-t border-gray-200 pt-1.5"><span>Balance Due</span><span style="color:#00BCD4;">Ksh {{ fmt(Math.max(0, viewInv.amount - (viewInv.paid_amount ?? 0))) }}</span></div>
                 </div>
                 <!-- Payment history -->
                 <div v-if="viewInv.payments?.length">
@@ -595,7 +595,7 @@ onMounted(async () => {
                         <span class="ml-2 text-gray-700 capitalize">{{ p.method }}</span>
                         <span v-if="p.reference" class="ml-2 text-xs text-gray-400">{{ p.reference }}</span>
                       </div>
-                      <span class="font-semibold text-green-600">KES {{ fmt(p.amount) }}</span>
+                      <span class="font-semibold text-green-600">Ksh {{ fmt(p.amount) }}</span>
                     </div>
                   </div>
                 </div>
@@ -614,7 +614,7 @@ onMounted(async () => {
               <div>
                 <h3 class="text-base font-bold text-gray-900">Record Payment</h3>
                 <p class="text-xs text-gray-500 mt-0.5">Balance due:
-                  <span class="font-semibold" style="color:#00BCD4;">KES {{ Number(payForm.amount || 0).toLocaleString() }}</span>
+                  <span class="font-semibold" style="color:#00BCD4;">Ksh {{ Number(payForm.amount || 0).toLocaleString() }}</span>
                 </p>
               </div>
               <button @click="showPayModal = false" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
@@ -630,7 +630,7 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (KES) <span class="text-red-500">*</span></label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh) <span class="text-red-500">*</span></label>
                   <input v-model.number="payForm.amount" type="number" min="1" placeholder="0"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>

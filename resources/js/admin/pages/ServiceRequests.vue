@@ -6,6 +6,7 @@ interface Booking { id: number; booking_number: string; delivery_date?: string; 
 interface ServiceRequest {
   id: number; request_number?: string; client: string; email: string; service: string
   budget?: string; timeline?: string; priority: string; status: string; description?: string
+  artwork_path?: string | null
   created_at: string; booking?: Booking | null
 }
 
@@ -318,6 +319,18 @@ onMounted(async () => {
                 <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{{ activeReq.description }}</p>
               </div>
 
+              <!-- Client-supplied artwork -->
+              <div v-if="activeReq.artwork_path" class="bg-cyan-50 border border-cyan-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                  <svg class="w-5 h-5 text-cyan-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                  <p class="text-sm font-semibold text-cyan-800 truncate">Client uploaded artwork</p>
+                </div>
+                <a :href="`/storage/${activeReq.artwork_path}`" target="_blank" rel="noopener"
+                   class="shrink-0 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg px-3 py-1.5 transition-colors">
+                  View / Download
+                </a>
+              </div>
+
               <!-- Linked booking -->
               <div v-if="activeReq.booking" class="bg-green-50 border border-green-200 rounded-xl p-4">
                 <p class="text-xs font-semibold text-green-700 uppercase tracking-wider mb-2">Booking Created</p>
@@ -395,7 +408,7 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Agreed Price (KES)</label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Agreed Price (Ksh)</label>
                   <input v-model.number="convertForm.price" type="number" min="0" placeholder="0"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>

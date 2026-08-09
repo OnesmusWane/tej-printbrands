@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ContactMessage;
+use App\Models\DailyLedgerEntry;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\ServiceBooking;
@@ -38,7 +39,7 @@ class AdminDashboardController extends Controller
             ->whereYear('updated_at', now()->year)
             ->count();
 
-        // 6-month chart: revenue from orders + invoices per month
+        // 6-month chart: revenue (orders + invoices + manually logged cash sales) vs logged expenses, per month
         $months = collect(range(5, 0))->map(function ($i) {
             $m = now()->subMonths($i);
             $rev = (int) (
@@ -50,17 +51,27 @@ class AdminDashboardController extends Controller
                     ->whereYear('created_at', $m->year)
                     ->whereMonth('created_at', $m->month)
                     ->sum('amount')
+                + DailyLedgerEntry::where('type', 'sale')
+                    ->whereYear('entry_date', $m->year)
+                    ->whereMonth('entry_date', $m->month)
+                    ->sum('amount')
             ) / 1000;
 
             $exp = (int) (
-                Order::whereIn('payment_status', ['pending', 'failed'])
-                    ->whereYear('created_at', $m->year)
-                    ->whereMonth('created_at', $m->month)
-                    ->sum('total')
+                DailyLedgerEntry::where('type', 'expense')
+                    ->whereYear('entry_date', $m->year)
+                    ->whereMonth('entry_date', $m->month)
+                    ->sum('amount')
             ) / 1000;
 
             return ['label' => $m->format('M'), 'revenue' => $rev, 'expenses' => $exp];
         })->values();
+
+        // Daily ledger: today's and this-month's manually logged sales/expenses
+        $todaySales    = (int) DailyLedgerEntry::where('type', 'sale')->whereDate('entry_date', today())->sum('amount');
+        $todayExpenses = (int) DailyLedgerEntry::where('type', 'expense')->whereDate('entry_date', today())->sum('amount');
+        $monthSales    = (int) DailyLedgerEntry::where('type', 'sale')->whereYear('entry_date', now()->year)->whereMonth('entry_date', now()->month)->sum('amount');
+        $monthExpenses = (int) DailyLedgerEntry::where('type', 'expense')->whereYear('entry_date', now()->year)->whereMonth('entry_date', now()->month)->sum('amount');
 
         // Service distribution from order items
         $categories = ['Graphic Design', 'Printing', 'Branding', 'Signage', 'Promotional'];
@@ -159,6 +170,18 @@ class AdminDashboardController extends Controller
             'distribution'    => $distribution,
             'recent_orders'   => $recentOrders,
             'recent_activity' => array_slice($activity, 0, 6),
+            'daily_ledger'    => [
+                'today' => [
+                    'sales'    => $todaySales,
+                    'expenses' => $todayExpenses,
+                    'net'      => $todaySales - $todayExpenses,
+                ],
+                'this_month' => [
+                    'sales'    => $monthSales,
+                    'expenses' => $monthExpenses,
+                    'net'      => $monthSales - $monthExpenses,
+                ],
+            ],
         ]);
     }
 }

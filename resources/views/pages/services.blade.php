@@ -134,14 +134,14 @@
             <div class="mx-auto grid max-w-5xl items-center gap-8 pt-6 md:grid-cols-3">
                 @foreach ($tiersOrdered as $tier)
                     @php
-                        // Extract first number from price string (handles "From KES 15,000", "KES 75,000+", etc.)
+                        // Extract first number from price string (handles "From Ksh 15,000", "Ksh 75,000+", etc.)
                         preg_match('/\d[\d,]*/', $tier['price'], $pm);
                         $pv = isset($pm[0]) ? (int) str_replace(',', '', $pm[0]) : 0;
                         $tierBudget = match(true) {
-                            $pv >= 75000 => 'KES 75,000+',
-                            $pv >= 30000 => 'KES 30,000 - 75,000',
-                            $pv >= 10000 => 'KES 10,000 - 30,000',
-                            $pv > 0      => 'Below KES 10,000',
+                            $pv >= 75000 => 'Ksh 75,000+',
+                            $pv >= 30000 => 'Ksh 30,000 - 75,000',
+                            $pv >= 10000 => 'Ksh 10,000 - 30,000',
+                            $pv > 0      => 'Below Ksh 10,000',
                             default      => '',
                         };
                     @endphp

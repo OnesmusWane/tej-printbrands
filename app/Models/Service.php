@@ -25,18 +25,19 @@ class Service extends Model
         });
     }
 
-    protected $fillable = ['slug', 'title', 'description', 'icon', 'image_url', 'starting_price', 'features', 'sub_services', 'is_featured', 'is_visible', 'sort_order'];
+    protected $fillable = ['slug', 'title', 'description', 'icon', 'image_url', 'images', 'starting_price', 'features', 'sub_services', 'is_featured', 'is_visible', 'sort_order'];
 
     protected $appends = ['image', 'reverse'];
 
     protected function casts(): array
     {
-        return ['features' => 'array', 'sub_services' => 'array', 'is_featured' => 'boolean', 'is_visible' => 'boolean', 'sort_order' => 'integer'];
+        return ['features' => 'array', 'sub_services' => 'array', 'images' => 'array', 'is_featured' => 'boolean', 'is_visible' => 'boolean', 'sort_order' => 'integer'];
     }
 
     public function getImageAttribute(): ?string
     {
-        return $this->image_url;
+        $imgs = array_filter($this->images ?? []);
+        return array_values($imgs)[0] ?? $this->image_url;
     }
 
     public function getReverseAttribute(): bool

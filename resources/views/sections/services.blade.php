@@ -17,7 +17,7 @@
                         }
                     }
                     $lowestPrice = !empty($allPrices) ? min($allPrices) : null;
-                    $priceLabel  = $lowestPrice ? 'From KES ' . number_format($lowestPrice) : ($service['starting_price'] ?? null);
+                    $priceLabel  = $lowestPrice ? 'From Ksh ' . number_format($lowestPrice) : ($service['starting_price'] ?? null);
                 @endphp
                 <a href="{{ route('service.detail', $service['slug']) }}"
                    class="group flex flex-col overflow-hidden rounded-xl bg-white shadow-md transition duration-300 hover:-translate-y-2 hover:shadow-xl no-underline">
