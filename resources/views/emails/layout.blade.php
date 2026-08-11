@@ -10,9 +10,11 @@
     $phone = $contact['phone'] ?? '';
     $contactEmail = $contact['email'] ?? '';
 
+    $socialLabels = ['twitter' => 'X'];
+
     $socialLinks = collect($socials)
-        ->filter(fn ($url) => filled($url) && $url !== '#')
-        ->map(fn ($url, $label) => ['label' => ucfirst($label), 'url' => $url]);
+        ->filter(fn ($url) => is_string($url) && preg_match('#^https?://#i', $url))
+        ->map(fn ($url, $label) => ['label' => $socialLabels[$label] ?? ucfirst($label), 'url' => $url]);
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -31,13 +33,17 @@
           <!-- ═══ HEADER ═══ -->
           <tr>
             <td align="center" style="background:#00BCD4;padding:32px 32px 26px;">
-              @if ($logoUrl)
-                <img src="{{ $logoUrl }}" alt="{{ $companyName }}" height="44" style="display:block;margin:0 auto 10px;max-height:44px;">
-              @else
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 10px;">
-                  <tr><td width="48" height="48" align="center" valign="middle" style="background:#ffffff;border-radius:12px;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#00BCD4;">{{ strtoupper(substr($companyName, 0, 2)) }}</td></tr>
-                </table>
-              @endif
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 10px;">
+                <tr>
+                  <td width="64" height="64" align="center" valign="middle" style="background:#ffffff;border-radius:50%;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#00BCD4;">
+                    @if ($logoUrl)
+                      <img src="{{ $logoUrl }}" alt="{{ $companyName }}" width="48" style="display:block;max-width:48px;">
+                    @else
+                      {{ strtoupper(substr($companyName, 0, 2)) }}
+                    @endif
+                  </td>
+                </tr>
+              </table>
               <div style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-weight:bold;font-size:15px;letter-spacing:0.5px;">{{ strtoupper($companyName) }}</div>
             </td>
           </tr>
@@ -61,6 +67,7 @@
               @endif
 
               @if ($socialLinks->isNotEmpty())
+                <p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;">Follow {{ $companyName }} on social media</p>
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px;">
                   <tr>
                     @foreach ($socialLinks as $social)
