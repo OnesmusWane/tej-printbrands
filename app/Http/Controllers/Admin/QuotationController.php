@@ -78,7 +78,7 @@ class QuotationController extends Controller
             'items' => ['sometimes', 'array', 'min:1'],
             'items.*.description' => ['required_with:items', 'string', 'max:255'],
             'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required_with:items', 'integer', 'min:0'],
+            'items.*.unit_price' => ['required_with:items', 'numeric', 'min:0'],
         ]);
 
         $wasPending = $quotation->status === 'pending';

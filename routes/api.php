@@ -80,6 +80,8 @@ Route::middleware(['web', 'auth', 'admin'])->prefix('admin')->name('api.admin.')
     Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.record');
     Route::patch('/payments/{payment}', [PaymentController::class, 'update'])->name('payments.update');
+    Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+    Route::post('/payments/{payment}/send', [PaymentController::class, 'send'])->name('payments.send');
 
     Route::post('profile/change-password', function (Request $request) {
         $request->validate(['current_password' => ['required', 'current_password'], 'password' => ['required', 'min:8', 'confirmed']]);

@@ -10,11 +10,11 @@ class Payment extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['invoice_id', 'payment_number', 'client', 'amount', 'method', 'reference', 'status', 'paid_at'];
+    protected $fillable = ['invoice_id', 'payment_number', 'client', 'email', 'amount', 'method', 'reference', 'status', 'paid_at', 'sent_at'];
 
     protected function casts(): array
     {
-        return ['amount' => 'integer', 'paid_at' => 'datetime'];
+        return ['amount' => 'decimal:2', 'paid_at' => 'datetime', 'sent_at' => 'datetime'];
     }
 
     public function invoice(): BelongsTo

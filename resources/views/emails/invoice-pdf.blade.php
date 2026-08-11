@@ -19,6 +19,19 @@
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;margin-bottom:24px;">
     <tr>
       <td style="padding:24px;font-family:Arial,Helvetica,sans-serif;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
+          <tr>
+            <td style="padding:0 12px 0 0;width:50%;" valign="top">
+              <span style="text-transform:uppercase;letter-spacing:0.5px;font-size:11px;color:#9CA3AF;">Invoice Date</span><br>
+              <span style="font-size:14px;color:#1F2937;font-weight:bold;">{{ $invoice->created_at->format('d M Y') }}</span>
+            </td>
+            <td style="padding:0 0 0 12px;width:50%;" valign="top">
+              <span style="text-transform:uppercase;letter-spacing:0.5px;font-size:11px;color:#9CA3AF;">Due Date</span><br>
+              <span style="font-size:14px;color:#1F2937;font-weight:bold;">{{ $invoice->due_date ? $invoice->due_date->format('d M Y') : 'Upon receipt' }}</span>
+            </td>
+          </tr>
+        </table>
+
         @if ($invoice->service)
           <p style="margin:0 0 16px;font-size:13px;color:#6B7280;">
             <span style="text-transform:uppercase;letter-spacing:0.5px;font-size:11px;color:#9CA3AF;">Service</span><br>

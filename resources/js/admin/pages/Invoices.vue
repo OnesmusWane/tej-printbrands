@@ -44,7 +44,7 @@ const form = ref({
 const includeVat = ref(true)
 
 const subtotal = computed(() => form.value.items.reduce((s, i) => s + i.qty * i.unit_price, 0))
-const vat = computed(() => (includeVat.value ? Math.round(subtotal.value * 0.16) : 0))
+const vat = computed(() => (includeVat.value ? Math.round(subtotal.value * 0.16 * 100) / 100 : 0))
 const total = computed(() => subtotal.value + vat.value)
 
 function addItem() { form.value.items.push(defaultItem()) }
@@ -82,7 +82,7 @@ function openEdit(inv: Invoice) {
     due_date: inv.due_date ? inv.due_date.slice(0, 10) : '',
     payment_method: inv.payment_method ?? '',
     terms: inv.terms ?? '',
-    items: (inv.items ?? []).map(i => ({ description: i.description, qty: i.quantity, unit_price: i.unit_price })),
+    items: (inv.items ?? []).map(i => ({ description: i.description, qty: Number(i.quantity), unit_price: Number(i.unit_price) })),
   }
   if (form.value.items.length === 0) form.value.items = [defaultItem()]
   includeVat.value = inv.vat_included !== false
@@ -99,7 +99,7 @@ function onQuotationSelect() {
     form.value.service = q.service ?? ''
     includeVat.value = q.vat_included !== false
     if (q.items?.length) {
-      form.value.items = q.items.map(i => ({ description: i.description, qty: i.quantity, unit_price: i.unit_price }))
+      form.value.items = q.items.map(i => ({ description: i.description, qty: Number(i.quantity), unit_price: Number(i.unit_price) }))
     }
   }
 }
@@ -679,7 +679,7 @@ onMounted(async () => {
                           <input v-model.number="item.qty" type="number" min="1" class="w-full border-0 focus:ring-0 text-sm text-center px-1 py-1 outline-none"/>
                         </td>
                         <td class="px-2 py-1.5">
-                          <input v-model.number="item.unit_price" type="number" min="0" class="w-full border-0 focus:ring-0 text-sm text-right px-1 py-1 outline-none"/>
+                          <input v-model.number="item.unit_price" type="number" min="0" step="0.01" class="w-full border-0 focus:ring-0 text-sm text-right px-1 py-1 outline-none"/>
                         </td>
                         <td class="px-3 py-1.5 text-xs font-semibold text-gray-800 text-right">Ksh {{ (item.qty * item.unit_price).toLocaleString() }}</td>
                         <td class="px-2 py-1.5">
@@ -807,7 +807,7 @@ onMounted(async () => {
                   <div class="text-right">
                     <p class="text-xs text-gray-400 mb-0.5">Issued</p>
                     <p class="text-gray-700">{{ fmtDate(viewInv.created_at) }}</p>
-                    <p v-if="viewInv.due_date" class="text-xs text-gray-500 mt-1">Due: {{ fmtDate(viewInv.due_date) }}</p>
+                    <p class="text-xs text-gray-500 mt-1">Due: {{ fmtDate(viewInv.due_date) }}</p>
                   </div>
                 </div>
                 <!-- Line items -->
@@ -889,7 +889,7 @@ onMounted(async () => {
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh) <span class="text-red-500">*</span></label>
-                  <input v-model.number="payForm.amount" type="number" min="1" placeholder="0"
+                  <input v-model.number="payForm.amount" type="number" min="0.01" step="0.01" placeholder="0"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>

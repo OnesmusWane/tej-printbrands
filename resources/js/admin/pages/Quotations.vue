@@ -78,7 +78,7 @@ const includeVat = ref(true);
 const subtotal = computed(() =>
     form.value.items.reduce((s, i) => s + i.qty * i.unit_price, 0),
 );
-const vat = computed(() => (includeVat.value ? Math.round(subtotal.value * 0.16) : 0));
+const vat = computed(() => (includeVat.value ? Math.round(subtotal.value * 0.16 * 100) / 100 : 0));
 const total = computed(() => subtotal.value + vat.value);
 
 function addItem() {
@@ -113,8 +113,8 @@ function openEdit(q: Quotation) {
         quote_request_id: null,
         items: (q.items ?? []).map((i) => ({
             description: i.description,
-            qty: i.quantity,
-            unit_price: i.unit_price,
+            qty: Number(i.quantity),
+            unit_price: Number(i.unit_price),
         })),
     };
     if (form.value.items.length === 0) form.value.items = [defaultItem()];
@@ -1311,6 +1311,7 @@ onMounted(async () => {
                                                         "
                                                         type="number"
                                                         min="0"
+                                                        step="0.01"
                                                         placeholder="0"
                                                         class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-cyan-500"
                                                     />

@@ -22,11 +22,11 @@ class Invoice extends Model
     protected function casts(): array
     {
         return [
-            'amount' => 'integer',
-            'subtotal' => 'integer',
-            'tax' => 'integer',
+            'amount' => 'decimal:2',
+            'subtotal' => 'decimal:2',
+            'tax' => 'decimal:2',
             'vat_included' => 'boolean',
-            'paid_amount' => 'integer',
+            'paid_amount' => 'decimal:2',
             'due_date' => 'date',
             'sent_at' => 'datetime',
         ];
@@ -47,8 +47,8 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
-    public function getBalanceDueAttribute(): int
+    public function getBalanceDueAttribute(): float
     {
-        return max(0, $this->amount - $this->paid_amount);
+        return max(0, (float) $this->amount - (float) $this->paid_amount);
     }
 }

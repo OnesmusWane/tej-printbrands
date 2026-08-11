@@ -22,12 +22,12 @@ class QuotationService
 
         foreach ($items as $item) {
             $quantity = (int) Arr::get($item, 'quantity', 1);
-            $unitPrice = (int) Arr::get($item, 'unit_price', 0);
+            $unitPrice = round((float) Arr::get($item, 'unit_price', 0), 2);
             $quotation->items()->create([
                 'description' => Arr::get($item, 'description'),
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
-                'total' => $quantity * $unitPrice,
+                'total' => round($quantity * $unitPrice, 2),
             ]);
         }
 
@@ -57,12 +57,12 @@ class QuotationService
 
             foreach ($items as $item) {
                 $quantity = (int) Arr::get($item, 'quantity', 1);
-                $unitPrice = (int) Arr::get($item, 'unit_price', 0);
+                $unitPrice = round((float) Arr::get($item, 'unit_price', 0), 2);
                 $quotation->items()->create([
                     'description' => Arr::get($item, 'description'),
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
-                    'total' => $quantity * $unitPrice,
+                    'total' => round($quantity * $unitPrice, 2),
                 ]);
             }
         }
@@ -72,9 +72,9 @@ class QuotationService
 
     private function totals(array $items, bool $vatIncluded): array
     {
-        $subtotal = collect($items)->sum(fn (array $item) => ((int) ($item['quantity'] ?? 1)) * ((int) ($item['unit_price'] ?? 0)));
-        $tax = $vatIncluded ? (int) round($subtotal * 0.16) : 0;
+        $subtotal = round(collect($items)->sum(fn (array $item) => ((int) ($item['quantity'] ?? 1)) * ((float) ($item['unit_price'] ?? 0))), 2);
+        $tax = $vatIncluded ? round($subtotal * 0.16, 2) : 0;
 
-        return ['subtotal' => $subtotal, 'tax' => $tax, 'total' => $subtotal + $tax];
+        return ['subtotal' => $subtotal, 'tax' => $tax, 'total' => round($subtotal + $tax, 2)];
     }
 }

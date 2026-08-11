@@ -15,7 +15,7 @@ class Quotation extends Model
 
     protected function casts(): array
     {
-        return ['subtotal' => 'integer', 'tax' => 'integer', 'vat_included' => 'boolean', 'total' => 'integer', 'sent_at' => 'datetime'];
+        return ['subtotal' => 'decimal:2', 'tax' => 'decimal:2', 'vat_included' => 'boolean', 'total' => 'decimal:2', 'sent_at' => 'datetime'];
     }
 
     public function serviceRequest(): BelongsTo

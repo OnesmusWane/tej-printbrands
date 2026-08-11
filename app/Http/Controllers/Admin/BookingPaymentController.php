@@ -15,7 +15,7 @@ class BookingPaymentController extends Controller
     {
         $data = $request->validate([
             'method'    => ['required', 'in:cash,mpesa,bank_transfer'],
-            'amount'    => ['required', 'integer', 'min:1'],
+            'amount'    => ['required', 'numeric', 'min:0.01'],
             'reference' => ['nullable', 'string', 'max:120'],
             'phone'     => ['nullable', 'string', 'max:20'],
         ]);

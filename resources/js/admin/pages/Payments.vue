@@ -2,18 +2,20 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '../api'
 
-interface Invoice { id: number; invoice_number: string; client: string; amount: number; paid_amount?: number; status: string }
+interface Invoice { id: number; invoice_number: string; client: string; email?: string; amount: number; paid_amount?: number; status: string }
 interface ServiceItem { id: number; label: string; type: 'order' | 'booking' | 'invoice'; amount?: number; client?: string }
 interface Payment {
   id: number; payment_number?: string; invoice_id?: number; invoice_number?: string
-  client?: string; client_name?: string; amount: number; method?: string; payment_method?: string
-  reference?: string; status?: string; payment_date?: string; paid_at?: string; created_at?: string
+  client?: string; client_name?: string; email?: string; amount: number; method?: string; payment_method?: string
+  reference?: string; status?: string; sent_at?: string; payment_date?: string; paid_at?: string; created_at?: string
 }
 
 const loading   = ref(true)
 const saving         = ref(false)
 const showModal      = ref(false)
 const updatingPayId  = ref<number | null>(null)
+const sendingId      = ref<number | null>(null)
+const editingId      = ref<number | null>(null)
 const payments  = ref<Payment[]>([])
 const invoices  = ref<Invoice[]>([])
 const search    = ref('')
@@ -29,6 +31,7 @@ const tabs = [
 const form = ref({
   invoice_id: 0,
   client:     '',
+  email:      '',
   amount:     0,
   method:     'cash' as string,
   reference:  '',
@@ -42,7 +45,8 @@ function onInvoiceSelect() {
   const inv = invoices.value.find(i => i.id === form.value.invoice_id)
   if (inv) {
     form.value.client = inv.client
-    form.value.amount = Math.max(0, inv.amount - (inv.paid_amount ?? 0))
+    form.value.email = inv.email ?? ''
+    form.value.amount = Math.max(0, Number(inv.amount) - Number(inv.paid_amount ?? 0))
   }
 }
 
@@ -87,10 +91,27 @@ function fmtDate(d?: string) { if (!d) return '-'; return new Date(d).toLocaleDa
 
 // ─── modal ────────────────────────────────────────────────────────────────────
 function openModal() {
-  form.value = { invoice_id: 0, client: '', amount: 0, method: 'cash', reference: '', date: new Date().toISOString().slice(0, 10) }
+  editingId.value = null
+  form.value = { invoice_id: 0, client: '', email: '', amount: 0, method: 'cash', reference: '', date: new Date().toISOString().slice(0, 10) }
   formError.value = ''
   showModal.value = true
 }
+
+function openEdit(pmt: Payment) {
+  editingId.value = pmt.id
+  form.value = {
+    invoice_id: pmt.invoice_id ?? 0,
+    client:     pmt.client ?? pmt.client_name ?? '',
+    email:      pmt.email ?? '',
+    amount:     Number(pmt.amount ?? 0),
+    method:     normalizeMethod(pmt.method ?? pmt.payment_method) || 'cash',
+    reference:  pmt.reference ?? '',
+    date:       (pmt.paid_at ?? pmt.payment_date ?? pmt.created_at ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+  }
+  formError.value = ''
+  showModal.value = true
+}
+
 function closeModal() { showModal.value = false }
 
 async function updatePaymentStatus(pmt: Payment, status: string) {
@@ -110,27 +131,69 @@ async function submitPayment() {
   try {
     const payload: any = {
       client:     form.value.client,
+      email:      form.value.email || null,
       amount:     form.value.amount,
       method:     form.value.method,
       reference:  form.value.reference || null,
       paid_at:    form.value.date,
+      invoice_id: form.value.invoice_id || null,
     }
-    if (form.value.invoice_id) payload.invoice_id = form.value.invoice_id
-    const { data } = await api.post('/payments', payload)
-    payments.value.unshift(data.data ?? data)
-    // Update invoice paid amount locally
-    if (form.value.invoice_id) {
-      const idx = invoices.value.findIndex(i => i.id === form.value.invoice_id)
-      if (idx !== -1) {
-        invoices.value[idx].paid_amount = (invoices.value[idx].paid_amount ?? 0) + form.value.amount
-        if (invoices.value[idx].paid_amount >= invoices.value[idx].amount) invoices.value[idx].status = 'paid'
-        else invoices.value[idx].status = 'partial'
+
+    if (editingId.value) {
+      const { data } = await api.patch(`/payments/${editingId.value}`, payload)
+      const record = data.data ?? data
+      const idx = payments.value.findIndex(p => p.id === editingId.value)
+      if (idx !== -1) payments.value[idx] = record
+    } else {
+      const { data } = await api.post('/payments', payload)
+      payments.value.unshift(data.data ?? data)
+      // Update invoice paid amount locally
+      if (form.value.invoice_id) {
+        const idx = invoices.value.findIndex(i => i.id === form.value.invoice_id)
+        if (idx !== -1) {
+          invoices.value[idx].paid_amount = Number(invoices.value[idx].paid_amount ?? 0) + Number(form.value.amount)
+          if (invoices.value[idx].paid_amount! >= Number(invoices.value[idx].amount)) invoices.value[idx].status = 'paid'
+          else invoices.value[idx].status = 'partial'
+        }
       }
     }
     closeModal()
   } catch (e: any) {
     formError.value = e.response?.data?.message ?? Object.values(e.response?.data?.errors ?? {})?.[0]?.[0] ?? 'Payment failed.'
   } finally { saving.value = false }
+}
+
+async function deletePayment(pmt: Payment) {
+  if (!confirm('Delete this payment? This will roll back its amount from the linked invoice, if any.')) return
+  try {
+    await api.delete(`/payments/${pmt.id}`)
+    payments.value = payments.value.filter(p => p.id !== pmt.id)
+  } catch (e) { console.error(e) }
+}
+
+async function sendReceipt(pmt: Payment, email?: string) {
+  sendingId.value = pmt.id
+  try {
+    const { data } = await api.post(`/payments/${pmt.id}/send`, email ? { email } : {})
+    const record = data.data ?? data
+    const idx = payments.value.findIndex(p => p.id === pmt.id)
+    if (idx !== -1) payments.value[idx] = record
+  } catch (e: any) {
+    alert(e.response?.data?.message ?? 'Failed to send receipt.')
+  } finally { sendingId.value = null }
+}
+
+function resendReceipt(pmt: Payment) {
+  const currentEmail = pmt.email
+  if (!currentEmail) {
+    const email = prompt("This payment has no email on file. Enter the client's email to send the receipt:")
+    if (!email) return
+    sendReceipt(pmt, email.trim())
+    return
+  }
+  if (confirm(`Resend the receipt to ${currentEmail}?`)) {
+    sendReceipt(pmt)
+  }
 }
 
 function amountInWords(n: number): string {
@@ -410,12 +473,26 @@ onMounted(async () => {
                 <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ pmt.reference ?? '-' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ fmtDate(pmt.paid_at ?? pmt.payment_date ?? pmt.created_at) }}</td>
                 <td class="px-6 py-4">
-                  <button @click="printReceipt(pmt)" title="Print Receipt"
-                    class="p-1.5 rounded-lg text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                    </svg>
-                  </button>
+                  <div class="flex items-center gap-1">
+                    <button @click="openEdit(pmt)" title="Edit"
+                      class="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                    <button @click="resendReceipt(pmt)" :disabled="sendingId === pmt.id" title="Resend Receipt"
+                      class="p-1.5 rounded-lg text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 transition-colors disabled:opacity-50">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                    <button @click="printReceipt(pmt)" title="Print Receipt"
+                      class="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                      </svg>
+                    </button>
+                    <button @click="deletePayment(pmt)" title="Delete"
+                      class="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -430,7 +507,7 @@ onMounted(async () => {
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="closeModal">
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 class="text-base font-bold text-gray-900">Record Payment</h3>
+              <h3 class="text-base font-bold text-gray-900">{{ editingId ? 'Edit Payment' : 'Record Payment' }}</h3>
               <button @click="closeModal" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
@@ -445,7 +522,7 @@ onMounted(async () => {
                   class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 bg-white transition-all">
                   <option :value="0">None — standalone payment</option>
                   <option v-for="inv in invoices" :key="inv.id" :value="inv.id">
-                    {{ inv.invoice_number }} · {{ inv.client }} · Ksh {{ fmt(inv.amount - (inv.paid_amount ?? 0)) }} due
+                    {{ inv.invoice_number }} · {{ inv.client }} · Ksh {{ fmt(Number(inv.amount) - Number(inv.paid_amount ?? 0)) }} due
                   </option>
                 </select>
               </div>
@@ -456,9 +533,14 @@ onMounted(async () => {
                   <input v-model="form.client" type="text" placeholder="Full name"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
+                <div class="col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Client Email</label>
+                  <input v-model="form.email" type="email" placeholder="email@example.com"
+                    class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
+                </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh) <span class="text-red-500">*</span></label>
-                  <input v-model.number="form.amount" type="number" min="1" placeholder="0"
+                  <input v-model.number="form.amount" type="number" min="0.01" step="0.01" placeholder="0"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
@@ -498,7 +580,7 @@ onMounted(async () => {
                   class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
                   style="background:#1F2937;">
                   <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  {{ saving ? 'Recording…' : 'Record Payment' }}
+                  {{ saving ? 'Saving…' : (editingId ? 'Save Changes' : 'Record Payment') }}
                 </button>
               </div>
             </div>
