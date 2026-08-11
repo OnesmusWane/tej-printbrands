@@ -4,17 +4,17 @@ namespace App\Services;
 
 use App\Models\Quotation;
 use App\Models\SiteSetting;
-use Illuminate\Support\Facades\Log;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
-use RuntimeException;
-use Symfony\Component\Process\Process;
 
 class QuotationPdfService
 {
     /**
-     * Render the quotation to a PDF using headless Chrome, so the output matches
-     * the on-screen/print design exactly (drop-shadow filters, gradients, flexbox —
-     * none of which a pure-PHP PDF renderer reproduces reliably).
+     * Render the quotation to a PDF with DomPDF (pure PHP, no external process) —
+     * this app runs on shared hosting where a local headless Chrome can't spawn
+     * enough threads to survive the host's process limits. The header/footer curves
+     * are pre-rendered static images (DomPDF can't reproduce the live CSS drop-shadow
+     * filter), with only the dynamic text/logo overlaid at render time.
      *
      * @return string absolute path to the generated PDF
      */
@@ -24,20 +24,7 @@ class QuotationPdfService
 
         $settings = SiteSetting::pluck('value', 'key');
 
-        // Inline the logo as a data URI instead of an http(s) URL back to this app.
-        // On a single-threaded dev server (`php artisan serve`), the request that's
-        // generating this PDF is what's blocking — so Chrome trying to fetch the logo
-        // from that same server deadlocks until this process's own timeout kills it.
-        $company = $settings->get('company', []);
-        if (! empty($company['logo_url'])) {
-            $company['logo_url'] = $this->inlineImage($company['logo_url']) ?? $company['logo_url'];
-            $settings->put('company', $company);
-        }
-
-        $html = view('pdf.quotation', [
-            'q' => $quotation,
-            'settings' => $settings,
-        ])->render();
+        $logoUrl = $this->inlineImage($settings->get('company', [])['logo_url'] ?? null);
 
         $dir = storage_path('app/quotations');
         if (! is_dir($dir)) {
@@ -45,35 +32,17 @@ class QuotationPdfService
         }
 
         $basename = preg_replace('/[^A-Za-z0-9_-]/', '_', $quotation->quote_number);
-        $htmlPath = "{$dir}/{$basename}.html";
         $pdfPath = "{$dir}/{$basename}.pdf";
 
-        file_put_contents($htmlPath, $html);
-
-        try {
-            $process = new Process([
-                config('services.chrome.path'),
-                '--headless',
-                '--disable-gpu',
-                '--no-sandbox',
-                '--print-to-pdf='.$pdfPath,
-                '--no-pdf-header-footer',
-                'file://'.$htmlPath,
-            ]);
-            $process->setTimeout(30);
-            $process->run();
-
-            if (! $process->isSuccessful() || ! is_file($pdfPath)) {
-                Log::error('Quotation PDF generation failed', [
-                    'quote_number' => $quotation->quote_number,
-                    'error' => $process->getErrorOutput(),
-                ]);
-
-                throw new RuntimeException('Failed to generate quotation PDF.');
-            }
-        } finally {
-            @unlink($htmlPath);
-        }
+        Pdf::loadView('pdf.quotation-dompdf', [
+            'q' => $quotation,
+            'settings' => $settings,
+            'logoUrl' => $logoUrl,
+            'headerBg' => public_path('images/pdf/quotation-header-bg.png'),
+            'footerBg' => public_path('images/pdf/quotation-footer-bg.png'),
+        ])
+            ->setPaper('a4', 'portrait')
+            ->save($pdfPath);
 
         return $pdfPath;
     }
@@ -81,10 +50,14 @@ class QuotationPdfService
     /**
      * Resolve a locally-hosted (this app's own /storage) image URL to a base64 data
      * URI by reading it straight off disk, bypassing HTTP entirely. Returns null for
-     * anything else (external URL, missing file) so the caller can fall back safely.
+     * anything else (external URL, missing file, or no logo set).
      */
-    private function inlineImage(string $url): ?string
+    private function inlineImage(?string $url): ?string
     {
+        if (! $url) {
+            return null;
+        }
+
         $relativePath = ImagePipeline::relativePathFromUrl($url);
 
         if ($relativePath === null || ! Storage::disk('public')->exists($relativePath)) {
