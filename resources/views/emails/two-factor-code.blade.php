@@ -1,8 +1,22 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Login Code</title></head>
-<body style="font-family:sans-serif;max-width:480px;margin:40px auto;padding:20px;color:#1F2937;">
-  <div style="text-align:center;margin-bottom:32px;"><div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;background:#00BCD4;border-radius:12px;"><span style="color:white;font-weight:bold;font-size:20px;">TJ</span></div></div>
-  <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;">Your Admin Login Code</h2>
-  <p style="color:#6B7280;margin-bottom:32px;">Hello {{ $name }}, enter this code to complete your sign-in.</p>
-  <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;"><span style="font-size:40px;font-weight:800;letter-spacing:0.2em;color:#1F2937;">{{ $code }}</span></div>
-  <p style="font-size:13px;color:#9CA3AF;">This code expires in 10 minutes. If you did not request this, ignore this email.</p>
-</body></html>
+@extends('emails.layout')
+
+@section('subject', 'Your Admin Login Code')
+
+@section('content')
+  <h2 style="margin:0 0 8px;font-size:22px;font-weight:bold;color:#1F2937;">Your Admin Login Code</h2>
+  <p style="margin:0 0 28px;font-size:15px;line-height:1.6;color:#6B7280;">
+    Hello {{ $name }}, enter this code to complete your sign-in.
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;margin-bottom:24px;">
+    <tr>
+      <td align="center" style="padding:28px;">
+        <span style="font-family:Arial,Helvetica,sans-serif;font-size:38px;font-weight:bold;letter-spacing:0.25em;color:#1F2937;">{{ $code }}</span>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;font-size:13px;line-height:1.6;color:#9CA3AF;">
+    This code expires in 10 minutes. If you did not request this, you can safely ignore this email.
+  </p>
+@endsection
