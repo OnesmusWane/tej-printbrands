@@ -61,29 +61,67 @@ class QuotationController extends Controller
         return response()->json($quotation, 201);
     }
 
-    public function update(Request $request, Quotation $quotation): JsonResponse
+    /**
+     * Handles both a plain status transition (from the Approve/Reject/Send buttons,
+     * which only ever send {status}) and a full content edit (client/email/items/etc,
+     * from the edit form) through the same endpoint.
+     */
+    public function update(Request $request, Quotation $quotation, QuotationService $service): JsonResponse
     {
-        $data = $request->validate([
-            'status' => ['required', 'in:draft,pending,approved,rejected'],
+        $validated = $request->validate([
+            'client' => ['sometimes', 'string', 'max:160'],
+            'email' => ['sometimes', 'email', 'max:160'],
+            'service' => ['sometimes', 'nullable', 'string', 'max:160'],
+            'terms' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'vat_included' => ['sometimes', 'boolean'],
+            'status' => ['sometimes', 'in:draft,pending,approved,rejected'],
+            'items' => ['sometimes', 'array', 'min:1'],
+            'items.*.description' => ['required_with:items', 'string', 'max:255'],
+            'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required_with:items', 'integer', 'min:0'],
         ]);
 
         $wasPending = $quotation->status === 'pending';
-        $quotation->update($data);
 
-        // Only email when the status is newly transitioning to 'pending' — not on every save.
-        if ($quotation->status === 'pending' && ! $wasPending) {
+        $quotation = $service->update($quotation, $validated);
+
+        // Only auto-email when the status is newly transitioning to 'pending' (the
+        // Send button) — a content edit doesn't email on its own; the frontend asks
+        // the admin first and, if confirmed, hits the dedicated /send endpoint below.
+        if (($validated['status'] ?? null) === 'pending' && ! $wasPending) {
             $this->emailQuotationPdf($quotation);
         }
 
-        return response()->json($quotation->load('items'));
+        return response()->json($quotation);
     }
 
-    public function send(Quotation $quotation): JsonResponse
+    /**
+     * Generate a fresh PDF and email it to the client — used for the initial "Send"
+     * action, resending an already-sent quotation, and sharing an edited version.
+     * Works regardless of current status; if no email is on file, the caller must
+     * supply one (and it's saved onto the quotation for next time).
+     */
+    public function send(Request $request, Quotation $quotation): JsonResponse
     {
-        $quotation->update(['status' => 'pending', 'sent_at' => now()]);
+        $validated = $request->validate([
+            'email' => ['nullable', 'email', 'max:160'],
+        ]);
+
+        $email = $validated['email'] ?? $quotation->email;
+
+        if (! $email) {
+            return response()->json(['message' => 'An email address is required to send this quotation.'], 422);
+        }
+
+        $quotation->update([
+            'email' => $email,
+            'status' => $quotation->status === 'draft' ? 'pending' : $quotation->status,
+            'sent_at' => now(),
+        ]);
+
         $this->emailQuotationPdf($quotation);
 
-        return response()->json($quotation);
+        return response()->json($quotation->load('items'));
     }
 
     public function destroy(Quotation $quotation): JsonResponse
@@ -94,16 +132,22 @@ class QuotationController extends Controller
     }
 
     /**
-     * Generate the quotation PDF (via headless Chrome, so it matches the on-screen
-     * design exactly) and email it to the client. Never blocks the calling request —
+     * Generate the quotation PDF (via DomPDF, so shared hosting never needs a local
+     * headless browser) and email it to the client. Never blocks the calling request —
      * a delivery failure is logged, not surfaced as an API error, since the quotation
      * itself has already been saved successfully by this point.
+     *
+     * The generated file is always deleted afterward — every quotation can be
+     * regenerated on demand from the database, so nothing is lost, and there's no
+     * reason to let PDFs accumulate on a disk-quota-constrained host.
      */
     private function emailQuotationPdf(Quotation $quotation): void
     {
         if (! $quotation->email) {
             return;
         }
+
+        $pdfPath = null;
 
         try {
             $pdfPath = app(QuotationPdfService::class)->generate($quotation);
@@ -113,6 +157,10 @@ class QuotationController extends Controller
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
             ]);
+        } finally {
+            if ($pdfPath && is_file($pdfPath)) {
+                @unlink($pdfPath);
+            }
         }
     }
 }

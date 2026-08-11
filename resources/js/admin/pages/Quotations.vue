@@ -56,9 +56,10 @@ const currentPage = ref(1);
 const activeTab = ref<"quotations" | "requests">("quotations");
 const perPage = 10;
 
-// ─── create modal ──────────────────────────────────────────────────────────
+// ─── create / edit modal ────────────────────────────────────────────────────
 const showCreate = ref(false);
 const createError = ref("");
+const editingQuoteId = ref<number | null>(null);
 const defaultItem = (): FormItem => ({
     description: "",
     qty: 1,
@@ -88,6 +89,7 @@ function removeItem(i: number) {
 }
 
 function openCreate() {
+    editingQuoteId.value = null;
     form.value = {
         client: "",
         email: "",
@@ -101,7 +103,27 @@ function openCreate() {
     showCreate.value = true;
 }
 
-async function submitCreate(status: string): Promise<Quotation | null> {
+function openEdit(q: Quotation) {
+    editingQuoteId.value = q.id;
+    form.value = {
+        client: q.client,
+        email: q.email,
+        service: q.service ?? "",
+        terms: q.terms ?? "",
+        quote_request_id: null,
+        items: (q.items ?? []).map((i) => ({
+            description: i.description,
+            qty: i.quantity,
+            unit_price: i.unit_price,
+        })),
+    };
+    if (form.value.items.length === 0) form.value.items = [defaultItem()];
+    includeVat.value = q.vat_included !== false;
+    createError.value = "";
+    showCreate.value = true;
+}
+
+async function submitCreate(status?: string): Promise<Quotation | null> {
     if (!form.value.client || !form.value.email) {
         createError.value = "Client name and email are required.";
         return null;
@@ -114,7 +136,6 @@ async function submitCreate(status: string): Promise<Quotation | null> {
             email: form.value.email,
             service: form.value.service,
             terms: form.value.terms,
-            status,
             vat_included: includeVat.value,
             items: form.value.items.map((i) => ({
                 description: i.description,
@@ -122,17 +143,28 @@ async function submitCreate(status: string): Promise<Quotation | null> {
                 unit_price: i.unit_price,
             })),
         };
-        if (form.value.quote_request_id) {
-            payload.quote_request_id = form.value.quote_request_id;
-        }
-        const { data } = await api.post("/quotations", payload);
-        const record = data.data ?? data;
-        quotations.value.unshift(record);
 
-        // Auto-update quote request status to 'quoted' locally
-        if (form.value.quote_request_id) {
-            const idx = requests.value.findIndex(r => r.id === form.value.quote_request_id);
-            if (idx !== -1) requests.value[idx] = { ...requests.value[idx], status: 'quoted' };
+        let record: Quotation;
+        if (editingQuoteId.value) {
+            const { data } = await api.patch(`/quotations/${editingQuoteId.value}`, payload);
+            record = data.data ?? data;
+            const idx = quotations.value.findIndex((x) => x.id === record.id);
+            if (idx !== -1) quotations.value[idx] = record;
+            if (viewQ.value?.id === record.id) viewQ.value = record;
+        } else {
+            payload.status = status;
+            if (form.value.quote_request_id) {
+                payload.quote_request_id = form.value.quote_request_id;
+            }
+            const { data } = await api.post("/quotations", payload);
+            record = data.data ?? data;
+            quotations.value.unshift(record);
+
+            // Auto-update quote request status to 'quoted' locally
+            if (form.value.quote_request_id) {
+                const idx = requests.value.findIndex(r => r.id === form.value.quote_request_id);
+                if (idx !== -1) requests.value[idx] = { ...requests.value[idx], status: 'quoted' };
+            }
         }
 
         showCreate.value = false;
@@ -148,10 +180,47 @@ async function submitCreate(status: string): Promise<Quotation | null> {
     }
 }
 
-async function submitCreateAndDownload() {
+async function submitCreateAndSend() {
     const record = await submitCreate("pending");
     if (record) {
         await buildAndPrint(record);
+    }
+}
+
+async function submitEditAndMaybeShare() {
+    const record = await submitCreate();
+    if (record && confirm(`Email this updated quotation to ${record.client} (${record.email})?`)) {
+        await sendQuotation(record.id);
+    }
+}
+
+// ─── send / resend ──────────────────────────────────────────────────────────
+const sendingId = ref<number | null>(null);
+
+async function sendQuotation(id: number, email?: string) {
+    sendingId.value = id;
+    try {
+        const { data } = await api.post(`/quotations/${id}/send`, email ? { email } : {});
+        const record = data.data ?? data;
+        const idx = quotations.value.findIndex((x) => x.id === id);
+        if (idx !== -1) quotations.value[idx] = record;
+        if (viewQ.value?.id === id) viewQ.value = record;
+    } catch (e: any) {
+        alert(e.response?.data?.message ?? "Failed to send quotation.");
+    } finally {
+        sendingId.value = null;
+    }
+}
+
+function resendQuotation(q: Quotation) {
+    if (!q.email) {
+        const email = prompt("This quotation has no email on file. Enter the client's email to send it:");
+        if (!email) return;
+        sendQuotation(q.id, email.trim());
+        return;
+    }
+    if (confirm(`Resend this quotation to ${q.email}?`)) {
+        sendQuotation(q.id);
     }
 }
 
@@ -800,6 +869,46 @@ onMounted(async () => {
                                                 </svg>
                                             </button>
                                             <button
+                                                @click="openEdit(q)"
+                                                class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                                title="Edit"
+                                            >
+                                                <svg
+                                                    class="w-4 h-4"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                v-if="q.status !== 'draft'"
+                                                @click="resendQuotation(q)"
+                                                :disabled="sendingId === q.id"
+                                                class="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors disabled:opacity-50"
+                                                title="Resend to client"
+                                            >
+                                                <svg
+                                                    class="w-4 h-4"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <button
                                                 @click="deleteQuotation(q.id)"
                                                 class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                                 title="Delete"
@@ -1034,7 +1143,7 @@ onMounted(async () => {
                             class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0"
                         >
                             <h3 class="text-base font-bold text-gray-900">
-                                Create Quotation
+                                {{ editingQuoteId ? "Edit Quotation" : "Create Quotation" }}
                             </h3>
                             <button
                                 @click="showCreate = false"
@@ -1293,7 +1402,12 @@ onMounted(async () => {
                                 ></textarea>
                             </div>
                             <p class="text-xs text-gray-400">
-                                "Save &amp; Print/Download" also emails a PDF copy of this quotation to the client's address above.
+                                <template v-if="editingQuoteId">
+                                    After saving, you'll be asked whether to email the updated quotation to the client.
+                                </template>
+                                <template v-else>
+                                    "Save &amp; Send" also emails a PDF copy of this quotation to the client's address above.
+                                </template>
                             </p>
                         </div>
                         <div
@@ -1313,6 +1427,7 @@ onMounted(async () => {
                                     Cancel
                                 </button>
                                 <button
+                                    v-if="!editingQuoteId"
                                     @click="submitCreate('draft')"
                                     :disabled="saving"
                                     class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
@@ -1320,7 +1435,7 @@ onMounted(async () => {
                                     Save Draft
                                 </button>
                                 <button
-                                    @click="submitCreateAndDownload"
+                                    @click="editingQuoteId ? submitEditAndMaybeShare() : submitCreateAndSend()"
                                     :disabled="saving"
                                     class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
                                     style="background: #1f2937"
@@ -1345,7 +1460,7 @@ onMounted(async () => {
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                                         />
                                     </svg>
-                                    Save &amp; Print/Download
+                                    {{ editingQuoteId ? "Save Changes" : "Save & Send" }}
                                 </button>
                             </div>
                         </div>
