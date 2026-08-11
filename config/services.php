@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'chrome' => [
+        'path' => env('CHROME_PATH', '/usr/bin/google-chrome'),
+    ],
+
 ];

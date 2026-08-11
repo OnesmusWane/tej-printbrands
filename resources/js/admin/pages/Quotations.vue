@@ -275,8 +275,17 @@ table{width:100%;border-collapse:collapse}
     <tbody>${itemRows}${blankRows}</tbody>
   </table>
 
-  <!-- Single TOTAL bar -->
-  <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-right:8px;">
+  <!-- Subtotal + VAT breakdown (only when VAT applies) -->
+  ${q.vat_included !== false ? `
+  <div style="display:flex;justify-content:flex-end;padding-right:8px;margin-top:8px;">
+    <table style="width:48%;">
+      <tr><td style="padding:4px 16px;font-size:12px;color:#6B7280;">Subtotal</td><td style="padding:4px 16px;font-size:12px;text-align:right;color:#1F2937;">Ksh ${Number(q.subtotal).toLocaleString()}</td></tr>
+      <tr><td style="padding:4px 16px;font-size:12px;color:#6B7280;border-bottom:1px solid #e5e7eb;">VAT (16%)</td><td style="padding:4px 16px;font-size:12px;text-align:right;color:#1F2937;border-bottom:1px solid #e5e7eb;">Ksh ${Number(q.tax).toLocaleString()}</td></tr>
+    </table>
+  </div>` : ''}
+
+  <!-- TOTAL bar -->
+  <div style="display:flex;justify-content:flex-end;margin-top:${q.vat_included !== false ? '6' : '10'}px;padding-right:8px;">
     <div style="width:48%;background:#111;color:#fff;font-weight:700;font-size:14px;padding:10px 16px;display:flex;justify-content:space-between;">
       <span>TOTAL${q.vat_included === false ? ' (VAT Exempt)' : ''}</span>
       <span>Ksh ${Number(q.total).toLocaleString()}</span>
@@ -1283,6 +1292,9 @@ onMounted(async () => {
                                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all resize-none"
                                 ></textarea>
                             </div>
+                            <p class="text-xs text-gray-400">
+                                "Save &amp; Print/Download" also emails a PDF copy of this quotation to the client's address above.
+                            </p>
                         </div>
                         <div
                             class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-between shrink-0"
