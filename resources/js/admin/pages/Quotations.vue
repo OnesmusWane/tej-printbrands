@@ -17,6 +17,7 @@ interface Quotation {
     service?: string;
     subtotal: number;
     tax: number;
+    vat_included?: boolean;
     total: number;
     status: string;
     terms?: string;
@@ -71,11 +72,12 @@ const form = ref({
     quote_request_id: null as number | null,
     items: [defaultItem()] as FormItem[],
 });
+const includeVat = ref(true);
 
 const subtotal = computed(() =>
     form.value.items.reduce((s, i) => s + i.qty * i.unit_price, 0),
 );
-const vat = computed(() => Math.round(subtotal.value * 0.16));
+const vat = computed(() => (includeVat.value ? Math.round(subtotal.value * 0.16) : 0));
 const total = computed(() => subtotal.value + vat.value);
 
 function addItem() {
@@ -94,14 +96,15 @@ function openCreate() {
         quote_request_id: null,
         items: [defaultItem()],
     };
+    includeVat.value = true;
     createError.value = "";
     showCreate.value = true;
 }
 
-async function submitCreate(status: string) {
+async function submitCreate(status: string): Promise<Quotation | null> {
     if (!form.value.client || !form.value.email) {
         createError.value = "Client name and email are required.";
-        return;
+        return null;
     }
     saving.value = true;
     createError.value = "";
@@ -112,6 +115,7 @@ async function submitCreate(status: string) {
             service: form.value.service,
             terms: form.value.terms,
             status,
+            vat_included: includeVat.value,
             items: form.value.items.map((i) => ({
                 description: i.description,
                 quantity: i.qty,
@@ -122,7 +126,8 @@ async function submitCreate(status: string) {
             payload.quote_request_id = form.value.quote_request_id;
         }
         const { data } = await api.post("/quotations", payload);
-        quotations.value.unshift(data.data ?? data);
+        const record = data.data ?? data;
+        quotations.value.unshift(record);
 
         // Auto-update quote request status to 'quoted' locally
         if (form.value.quote_request_id) {
@@ -131,13 +136,22 @@ async function submitCreate(status: string) {
         }
 
         showCreate.value = false;
+        return record;
     } catch (e: any) {
         createError.value =
             e.response?.data?.message ??
             Object.values(e.response?.data?.errors ?? {})?.[0]?.[0] ??
             "Failed.";
+        return null;
     } finally {
         saving.value = false;
+    }
+}
+
+async function submitCreateAndDownload() {
+    const record = await submitCreate("pending");
+    if (record) {
+        await buildAndPrint(record);
     }
 }
 
@@ -162,8 +176,10 @@ async function openView(q: Quotation) {
 
 async function printQuotation() {
     if (!viewQ.value) return;
-    const q = viewQ.value;
+    await buildAndPrint(viewQ.value);
+}
 
+async function buildAndPrint(q: Quotation) {
     const s: Record<string, any> = {};
     try {
         const { data } = await api.get('/site-settings');
@@ -190,117 +206,122 @@ async function printQuotation() {
 
     const itemRows = (q.items ?? []).map(i => `
         <tr>
-          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;">${i.description}</td>
-          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;text-align:center;">${i.quantity}</td>
-          <td style="padding:9px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
-          <td style="padding:9px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;">${i.description}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">${i.quantity}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #00BCD4;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
         </tr>`).join('');
 
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Quotation ${q.quote_number}</title>
-<style>@page{size:A4 portrait;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#1F2937;background:#fff}table{width:100%;border-collapse:collapse}</style>
-</head><body>
+    // Pad with blank ruled rows so short quotations still fill out like a ruled pad,
+    // matching the paper-template look even when there are only a couple of line items.
+    const blankRowsNeeded = Math.max(0, 10 - (q.items ?? []).length);
+    const blankRows = Array.from({ length: blankRowsNeeded })
+        .map(() => `<tr><td colspan="4" style="height:26px;border-bottom:1px solid #00BCD4;"></td></tr>`)
+        .join('');
 
-<!-- ═══ HEADER: blue left | diagonal | white right ═══ -->
-<div style="position:relative;height:145px;overflow:hidden;background:#fff;">
-  <!-- Full-width dark blue base (left portion) -->
-  <div style="position:absolute;inset:0;background:#1a237e;"></div>
-  <!-- Diagonal band: cyan (top) + red (bottom), as a gradient-filled polygon -->
-  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,#00BCD4 58%,#e53935 58%);clip-path:polygon(36% 0,60% 0,48% 100%,22% 100%);z-index:1;"></div>
-  <!-- White right section — covers everything from 60% onward -->
-  <div style="position:absolute;right:0;top:0;width:40%;height:100%;background:#fff;z-index:2;display:flex;flex-direction:column;justify-content:center;padding:16px 22px;">
-    <div style="font-size:30px;font-weight:900;color:#1F2937;letter-spacing:3px;margin-bottom:10px;">QUOTATION</div>
-    <div style="border:1px solid #ccc;font-size:11px;overflow:hidden;">
-      <div style="display:flex;border-bottom:1px solid #ccc;">
-        <div style="width:88px;padding:4px 8px;background:#f5f5f5;border-right:1px solid #ccc;color:#555;flex-shrink:0;">Date:</div>
-        <div style="padding:4px 8px;">${fd(q.created_at)}</div>
-      </div>
-      <div style="display:flex;border-bottom:1px solid #ccc;">
-        <div style="width:88px;padding:4px 8px;background:#f5f5f5;border-right:1px solid #ccc;color:#555;flex-shrink:0;">Quote:</div>
-        <div style="padding:4px 8px;">${q.quote_number}</div>
-      </div>
-      <div style="display:flex;">
-        <div style="width:88px;padding:4px 8px;background:#f5f5f5;border-right:1px solid #ccc;color:#555;flex-shrink:0;">Customer ID:</div>
-        <div style="padding:4px 8px;">${q.client}</div>
-      </div>
-    </div>
-  </div>
-  <!-- Company info over blue area -->
-  <div style="position:absolute;left:18px;top:0;height:100%;display:flex;align-items:center;gap:12px;z-index:3;">
-    <div style="width:70px;height:70px;border-radius:50%;background:#fff;overflow:hidden;border:3px solid rgba(255,255,255,.35);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-      ${logoUrl ? `<img src="${logoUrl}" style="width:64px;height:64px;object-fit:contain;" alt="">` : `<span style="font-size:24px;font-weight:900;color:#1a237e;">T</span>`}
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+<title>Quotation ${q.quote_number}</title>
+<style>
+@page{size:A4 portrait;margin:0}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}
+body{font-family:Arial,Helvetica,sans-serif;color:#1F2937;background:#fff}
+table{width:100%;border-collapse:collapse}
+</style>
+</head><body>
+<div style="border:4px solid #111;min-height:100vh;position:relative;overflow:hidden;">
+
+<!-- ═══ HEADER: cyan swoosh on top, red drop-shadow trailing beneath it | white (right) ═══ -->
+<div style="position:relative;height:210px;overflow:hidden;background:#fff;">
+  <svg viewBox="0 0 794 210" width="100%" height="210" preserveAspectRatio="none" style="position:absolute;inset:0;">
+    <path d="M0,0 L640,0 C 480,10 500,90 380,130 C 300,158 200,190 150,210 L0,210 Z"
+          fill="#00BCD4" style="filter:drop-shadow(11px 9px 3px #F44336);"/>
+  </svg>
+
+  <!-- Logo + company (over the cyan curve, left) -->
+  <div style="position:absolute;left:26px;top:24px;display:flex;align-items:center;gap:16px;z-index:3;">
+    <div style="width:82px;height:82px;border-radius:50%;background:#fff;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2);">
+      ${logoUrl ? `<img src="${logoUrl}" style="width:74px;height:74px;object-fit:contain;" alt="">` : `<span style="font-size:28px;font-weight:900;color:#1a237e;">T</span>`}
     </div>
     <div style="color:#fff;">
-      <div style="font-size:14px;font-weight:900;letter-spacing:1.5px;">${companyName.toUpperCase()}</div>
-      <div style="font-size:10px;opacity:.85;margin-top:4px;">${addr1}</div>
-      ${addr2 ? `<div style="font-size:10px;opacity:.85;">${addr2}</div>` : ''}
+      <div style="font-size:16px;font-weight:800;letter-spacing:1px;">${companyName.toUpperCase()}</div>
+      <div style="font-size:11px;opacity:.95;margin-top:7px;line-height:1.6;">${addr1}${addr2 ? `<br>${addr2}` : ''}</div>
     </div>
+  </div>
+
+  <!-- QUOTATION + date/quote/customer table (right, anchored toward the bottom of the header) -->
+  <div style="position:absolute;right:30px;bottom:14px;width:300px;z-index:3;">
+    <div style="font-size:32px;font-weight:800;color:#1F2937;letter-spacing:2px;margin-bottom:10px;text-align:right;">QUOTATION</div>
+    <table style="width:100%;font-size:11px;border-collapse:collapse;">
+      <tr><td style="border:1px solid #999;padding:5px 10px;width:90px;">Date:</td><td style="border:1px solid #999;padding:5px 10px;">${fd(q.created_at)}</td></tr>
+      <tr><td style="border:1px solid #999;padding:5px 10px;border-top:none;">Quote:</td><td style="border:1px solid #999;padding:5px 10px;border-top:none;">${q.quote_number}</td></tr>
+      <tr><td style="border:1px solid #999;padding:5px 10px;border-top:none;">Customer ID:</td><td style="border:1px solid #999;padding:5px 10px;border-top:none;">${q.client}</td></tr>
+    </table>
   </div>
 </div>
 
 <!-- ═══ ITEMS TABLE ═══ -->
-<div style="padding:20px 20px 8px;">
+<div style="padding:26px 26px 8px;">
   <table>
     <thead>
-      <tr style="background:#1F2937;color:#fff;">
+      <tr style="background:#111;color:#fff;">
         <th style="padding:10px 14px;text-align:left;font-size:12px;letter-spacing:.5px;">ITEM</th>
         <th style="padding:10px 14px;text-align:center;font-size:12px;letter-spacing:.5px;">QTY</th>
         <th style="padding:10px 8px;text-align:right;font-size:11px;line-height:1.3;">UNIT<br>PRICE</th>
         <th style="padding:10px 14px;text-align:right;font-size:12px;letter-spacing:.5px;">TOTAL</th>
       </tr>
     </thead>
-    <tbody>${itemRows}</tbody>
+    <tbody>${itemRows}${blankRows}</tbody>
   </table>
 
-  <!-- Totals right-aligned -->
-  <div style="display:flex;justify-content:flex-end;margin-top:6px;">
-    <table style="width:260px;">
-      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">Subtotal</td><td style="padding:6px 14px;font-size:12px;text-align:right;">Ksh ${Number(q.subtotal).toLocaleString()}</td></tr>
-      <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-size:12px;">VAT (16%)</td><td style="padding:6px 14px;font-size:12px;text-align:right;">Ksh ${Number(q.tax).toLocaleString()}</td></tr>
-      <tr style="background:#1F2937;"><td style="padding:9px 14px;color:#fff;font-weight:700;font-size:13px;">TOTAL</td><td style="padding:9px 14px;color:#00BCD4;font-weight:700;font-size:13px;text-align:right;">Ksh ${Number(q.total).toLocaleString()}</td></tr>
-    </table>
+  <!-- Single TOTAL bar -->
+  <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-right:8px;">
+    <div style="width:48%;background:#111;color:#fff;font-weight:700;font-size:14px;padding:10px 16px;display:flex;justify-content:space-between;">
+      <span>TOTAL${q.vat_included === false ? ' (VAT Exempt)' : ''}</span>
+      <span>Ksh ${Number(q.total).toLocaleString()}</span>
+    </div>
   </div>
 
   ${q.terms ? `<div style="margin-top:14px;font-size:11px;color:#6B7280;padding-top:10px;border-top:1px solid #e5e7eb;"><strong>Terms &amp; Conditions:</strong> ${q.terms}</div>` : ''}
 </div>
 
-<!-- ═══ FOOTER ═══ -->
-<div style="padding:14px 20px 0;">
-  <!-- Payment info box -->
-  <div style="display:inline-block;margin-bottom:16px;">
-    <div style="background:#1F2937;color:#fff;padding:5px 14px;font-size:12px;font-weight:700;display:inline-block;margin-bottom:3px;">Payment Info:</div>
-    <div style="font-size:12px;padding:2px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
-    <div style="font-size:12px;padding:2px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>
+<!-- ═══ PAYMENT INFO ═══ -->
+<div style="padding:20px 26px 0;">
+  <div style="display:inline-block;">
+    <div style="background:#111;color:#fff;padding:6px 16px;font-size:13px;font-weight:700;display:inline-block;margin-bottom:4px;">Payment Info:</div>
+    <div style="font-size:13px;padding:3px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
+    <div style="font-size:13px;padding:3px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>
   </div>
 </div>
 
-<!-- Bottom decorative strip (mirrors header: cyan left, red right, social icons) -->
-<div style="position:relative;height:46px;overflow:hidden;margin-top:4px;">
-  <!-- Red background -->
-  <div style="position:absolute;inset:0;background:#e53935;"></div>
-  <!-- Cyan left section with diagonal right edge -->
-  <div style="position:absolute;inset:0;background:#00BCD4;clip-path:polygon(0 0,70% 0,56% 100%,0 100%);z-index:1;"></div>
-  <!-- Social icons + contact on the right -->
-  <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;gap:6px;">
-    <div style="width:27px;height:27px;border-radius:50%;background:#25D366;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="13" height="13" fill="white" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+<!-- ═══ FOOTER: curved swoosh (mirrored, anchored right) with social icons ═══ -->
+<div style="position:absolute;left:0;right:0;bottom:0;height:64px;overflow:visible;">
+  <svg viewBox="0 0 794 64" width="100%" height="64" preserveAspectRatio="none" style="position:absolute;inset:0;overflow:visible;">
+    <path d="M794,64 L154,64 C 314,61 294,37 414,24 C 494,16 594,6 644,0 L794,0 Z"
+          fill="#00BCD4" style="filter:drop-shadow(-11px -9px 3px #F44336);"/>
+  </svg>
+  <div style="position:absolute;right:20px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;gap:8px;">
+    <div style="width:30px;height:30px;border-radius:50%;background:#F44336;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
     </div>
-    <div style="width:27px;height:27px;border-radius:50%;background:#1877F2;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="12" height="12" fill="white" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+    <div style="width:30px;height:30px;border-radius:50%;background:#1877F2;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="13" height="13" fill="white" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
     </div>
-    <div style="width:27px;height:27px;border-radius:50%;background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="12" height="12" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+    <div style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="13" height="13" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
     </div>
-    <div style="width:27px;height:27px;border-radius:50%;background:#010101;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="12" height="12" fill="white" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.22 6.22 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.37a8.16 8.16 0 004.77 1.53V6.47a4.85 4.85 0 01-1-.22z"/></svg>
+    <div style="width:30px;height:30px;border-radius:50%;background:#25D366;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 004.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2z"/></svg>
     </div>
-    <div style="width:27px;height:27px;border-radius:50%;background:#1DA1F2;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-      <svg width="12" height="12" fill="white" viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+    <div style="color:#fff;margin-left:6px;">
+      <div style="font-size:13px;font-weight:800;line-height:1.3;">${companyName.toLowerCase()}</div>
+      <div style="font-size:13px;font-weight:800;line-height:1.3;">${contactLine}</div>
     </div>
-    <span style="color:#fff;font-size:12px;font-weight:700;margin-left:5px;">${contactLine}</span>
   </div>
 </div>
 
+</div>
 </body></html>`;
 
     const win = window.open('', '_blank');
@@ -1228,9 +1249,12 @@ onMounted(async () => {
                                             }}</span
                                         >
                                     </div>
-                                    <div class="flex gap-12 text-gray-600">
-                                        <span>VAT (16%)</span
-                                        ><span
+                                    <div class="flex items-center gap-12 text-gray-600">
+                                        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                            <input type="checkbox" v-model="includeVat" class="accent-cyan-500">
+                                            VAT (16%)
+                                        </label>
+                                        <span
                                             >Ksh
                                             {{ vat.toLocaleString() }}</span
                                         >
@@ -1284,7 +1308,7 @@ onMounted(async () => {
                                     Save Draft
                                 </button>
                                 <button
-                                    @click="submitCreate('pending')"
+                                    @click="submitCreateAndDownload"
                                     :disabled="saving"
                                     class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
                                     style="background: #1f2937"
@@ -1309,7 +1333,7 @@ onMounted(async () => {
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                                         />
                                     </svg>
-                                    Send to Client
+                                    Save &amp; Print/Download
                                 </button>
                             </div>
                         </div>
@@ -1525,7 +1549,7 @@ onMounted(async () => {
                                         >
                                     </div>
                                     <div class="flex gap-16 text-gray-600">
-                                        <span>VAT (16%)</span
+                                        <span>{{ viewQ.vat_included === false ? 'VAT (Exempt)' : 'VAT (16%)' }}</span
                                         ><span>Ksh {{ fmt(viewQ.tax) }}</span>
                                     </div>
                                     <div

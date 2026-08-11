@@ -11,11 +11,11 @@ class Quotation extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['service_request_id', 'quote_request_id', 'quote_number', 'client', 'email', 'service', 'subtotal', 'tax', 'total', 'status', 'terms', 'sent_at'];
+    protected $fillable = ['service_request_id', 'quote_request_id', 'quote_number', 'client', 'email', 'service', 'subtotal', 'tax', 'vat_included', 'total', 'status', 'terms', 'sent_at'];
 
     protected function casts(): array
     {
-        return ['subtotal' => 'integer', 'tax' => 'integer', 'total' => 'integer', 'sent_at' => 'datetime'];
+        return ['subtotal' => 'integer', 'tax' => 'integer', 'vat_included' => 'boolean', 'total' => 'integer', 'sent_at' => 'datetime'];
     }
 
     public function serviceRequest(): BelongsTo

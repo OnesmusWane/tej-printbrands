@@ -19,6 +19,7 @@ class StoreQuotationRequest extends FormRequest
             'email' => ['required', 'email', 'max:160'],
             'service' => ['nullable', 'string', 'max:160'],
             'status' => ['nullable', 'string', 'max:40'],
+            'vat_included' => ['sometimes', 'boolean'],
             'terms' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['required', 'string', 'max:255'],

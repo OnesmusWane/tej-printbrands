@@ -12,8 +12,11 @@ class QuotationService
         $items = $data['items'] ?? [];
         unset($data['items']);
 
+        $vatIncluded = (bool) ($data['vat_included'] ?? true);
+
         $data['quote_number'] ??= 'QT-'.now()->format('Ymd').'-'.strtoupper(substr(uniqid(), -4));
-        $data = array_merge($data, $this->totals($items));
+        $data = array_merge($data, $this->totals($items, $vatIncluded));
+        $data['vat_included'] = $vatIncluded;
 
         $quotation = Quotation::create($data);
 
@@ -31,10 +34,10 @@ class QuotationService
         return $quotation->load('items');
     }
 
-    private function totals(array $items): array
+    private function totals(array $items, bool $vatIncluded): array
     {
         $subtotal = collect($items)->sum(fn (array $item) => ((int) ($item['quantity'] ?? 1)) * ((int) ($item['unit_price'] ?? 0)));
-        $tax = (int) round($subtotal * 0.16);
+        $tax = $vatIncluded ? (int) round($subtotal * 0.16) : 0;
 
         return ['subtotal' => $subtotal, 'tax' => $tax, 'total' => $subtotal + $tax];
     }
