@@ -59,6 +59,8 @@ Route::middleware(['web', 'auth', 'admin'])->prefix('admin')->name('api.admin.')
     Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     Route::patch('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
+    Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
+    Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
 
     // Service Requests
     Route::get('/service-requests', [ServiceRequestController::class, 'index'])->name('service-requests.index');

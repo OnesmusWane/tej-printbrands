@@ -4,7 +4,7 @@
     "name": "index"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BvG0NmzF.css",
+    "file": "assets/app-RrJP3TYT.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,7 +13,7 @@
     ]
   },
   "resources/js/admin/main.ts": {
-    "file": "assets/main-sAkbxim5.js",
+    "file": "assets/main-DAtRtPFM.js",
     "name": "main",
     "src": "resources/js/admin/main.ts",
     "isEntry": true,
@@ -21,7 +21,7 @@
       "_index-B8_nURbH.js"
     ],
     "css": [
-      "assets/main-C7E4rXO8.css"
+      "assets/main-D0laOyKe.css"
     ]
   },
   "resources/js/app.ts": {

@@ -3,13 +3,16 @@ import { ref, computed, onMounted } from 'vue'
 import api from '../api'
 
 interface QItem { id: number; description: string; quantity: number; unit_price: number; total: number }
-interface Quotation { id: number; quote_number: string; client: string; email: string; service?: string; total: number; items?: QItem[] }
+interface Quotation { id: number; quote_number: string; client: string; email: string; service?: string; total: number; vat_included?: boolean; items?: QItem[] }
+interface InvItem { id: number; description: string; quantity: number; unit_price: number; total: number }
 interface Payment { id: number; payment_number: string; amount: number; method: string; reference?: string; paid_at?: string }
 interface Invoice {
-  id: number; invoice_number: string; client: string; email?: string; amount: number; paid_amount?: number
-  status: string; due_date?: string; payment_method?: string; created_at: string
-  quotation?: Quotation; payments?: Payment[]
+  id: number; invoice_number: string; client: string; email?: string; service?: string
+  amount: number; subtotal?: number; tax?: number; vat_included?: boolean; paid_amount?: number; balance_due?: number
+  status: string; due_date?: string; payment_method?: string; terms?: string; sent_at?: string; created_at: string
+  quotation?: Quotation; payments?: Payment[]; items?: InvItem[]
 }
+interface FormItem { description: string; qty: number; unit_price: number }
 
 const loading      = ref(true)
 const saving       = ref(false)
@@ -23,6 +26,7 @@ const search       = ref('')
 const statusFilter = ref('')
 const createError   = ref('')
 const updatingInvId = ref<number | null>(null)
+const editingInvId  = ref<number | null>(null)
 const showPayModal  = ref(false)
 const paySaving     = ref(false)
 const payError      = ref('')
@@ -31,10 +35,20 @@ const payForm = ref({
   client: '', amount: 0, method: 'cash' as string, reference: '', date: new Date().toISOString().slice(0, 10),
 })
 
+const defaultItem = (): FormItem => ({ description: '', qty: 1, unit_price: 0 })
 const form = ref({
   quotation_id: 0,
-  client: '', email: '', amount: 0, due_date: '', payment_method: '', notes: '',
+  client: '', email: '', service: '', due_date: '', payment_method: '', terms: '',
+  items: [defaultItem()] as FormItem[],
 })
+const includeVat = ref(true)
+
+const subtotal = computed(() => form.value.items.reduce((s, i) => s + i.qty * i.unit_price, 0))
+const vat = computed(() => (includeVat.value ? Math.round(subtotal.value * 0.16) : 0))
+const total = computed(() => subtotal.value + vat.value)
+
+function addItem() { form.value.items.push(defaultItem()) }
+function removeItem(i: number) { form.value.items.splice(i, 1) }
 
 // ─── computed ────────────────────────────────────────────────────────────────
 const filtered = computed(() => {
@@ -49,32 +63,131 @@ const filtered = computed(() => {
 
 function countStatus(s: string) { return invoices.value.filter(i => i.status === s).length }
 
-// ─── open create modal ────────────────────────────────────────────────────────
+// ─── open create / edit modal ──────────────────────────────────────────────────
 function openCreate() {
-  form.value = { quotation_id: 0, client: '', email: '', amount: 0, due_date: '', payment_method: '', notes: '' }
+  editingInvId.value = null
+  form.value = { quotation_id: 0, client: '', email: '', service: '', due_date: '', payment_method: '', terms: '', items: [defaultItem()] }
+  includeVat.value = true
   createError.value = ''
   showCreate.value  = true
+}
+
+function openEdit(inv: Invoice) {
+  editingInvId.value = inv.id
+  form.value = {
+    quotation_id: 0,
+    client: inv.client,
+    email: inv.email ?? '',
+    service: inv.service ?? '',
+    due_date: inv.due_date ? inv.due_date.slice(0, 10) : '',
+    payment_method: inv.payment_method ?? '',
+    terms: inv.terms ?? '',
+    items: (inv.items ?? []).map(i => ({ description: i.description, qty: i.quantity, unit_price: i.unit_price })),
+  }
+  if (form.value.items.length === 0) form.value.items = [defaultItem()]
+  includeVat.value = inv.vat_included !== false
+  createError.value = ''
+  showCreate.value = true
 }
 
 function onQuotationSelect() {
   if (!form.value.quotation_id) return
   const q = quotations.value.find(q => q.id === form.value.quotation_id)
-  if (q) { form.value.client = q.client; form.value.email = q.email; form.value.amount = q.total }
+  if (q) {
+    form.value.client = q.client
+    form.value.email = q.email
+    form.value.service = q.service ?? ''
+    includeVat.value = q.vat_included !== false
+    if (q.items?.length) {
+      form.value.items = q.items.map(i => ({ description: i.description, qty: i.quantity, unit_price: i.unit_price }))
+    }
+  }
 }
 
-async function submitCreate() {
-  if (!form.value.client) { createError.value = 'Client name is required.'; return }
-  if (!form.value.amount) { createError.value = 'Amount is required.'; return }
+async function submitCreate(status?: string): Promise<Invoice | null> {
+  if (!form.value.client) { createError.value = 'Client name is required.'; return null }
+  if (!form.value.items.some(i => i.description && i.unit_price > 0)) { createError.value = 'At least one line item with a description and price is required.'; return null }
   saving.value = true; createError.value = ''
   try {
-    const payload: any = { ...form.value }
-    if (!payload.quotation_id) delete payload.quotation_id
-    const { data } = await api.post('/invoices', payload)
-    invoices.value.unshift(data.data ?? data)
+    const payload: Record<string, any> = {
+      client: form.value.client,
+      email: form.value.email,
+      service: form.value.service,
+      due_date: form.value.due_date || null,
+      payment_method: form.value.payment_method || null,
+      terms: form.value.terms,
+      vat_included: includeVat.value,
+      items: form.value.items.map(i => ({ description: i.description, quantity: i.qty, unit_price: i.unit_price })),
+    }
+
+    let record: Invoice
+    if (editingInvId.value) {
+      const { data } = await api.patch(`/invoices/${editingInvId.value}`, payload)
+      record = data.data ?? data
+      const idx = invoices.value.findIndex(x => x.id === record.id)
+      if (idx !== -1) invoices.value[idx] = record
+      if (viewInv.value?.id === record.id) viewInv.value = record
+    } else {
+      payload.status = status
+      if (form.value.quotation_id) payload.quotation_id = form.value.quotation_id
+      const { data } = await api.post('/invoices', payload)
+      record = data.data ?? data
+      invoices.value.unshift(record)
+    }
+
     showCreate.value = false
+    return record
   } catch (e: any) {
     createError.value = e.response?.data?.message ?? Object.values(e.response?.data?.errors ?? {})?.[0]?.[0] ?? 'Failed.'
+    return null
   } finally { saving.value = false }
+}
+
+async function submitCreateAndSend() {
+  await submitCreate('unpaid')
+}
+
+async function submitEditAndMaybeShare() {
+  const record = await submitCreate()
+  if (record && confirm(`Email this updated invoice to ${record.client} (${record.email})?`)) {
+    await sendInvoice(record.id)
+  }
+}
+
+// ─── send / resend ──────────────────────────────────────────────────────────
+const sendingId = ref<number | null>(null)
+
+async function sendInvoice(id: number, email?: string) {
+  sendingId.value = id
+  try {
+    const { data } = await api.post(`/invoices/${id}/send`, email ? { email } : {})
+    const record = data.data ?? data
+    const idx = invoices.value.findIndex(x => x.id === id)
+    if (idx !== -1) invoices.value[idx] = record
+    if (viewInv.value?.id === id) viewInv.value = record
+  } catch (e: any) {
+    alert(e.response?.data?.message ?? 'Failed to send invoice.')
+  } finally { sendingId.value = null }
+}
+
+function resendInvoice(inv: Invoice) {
+  if (!inv.email) {
+    const email = prompt("This invoice has no email on file. Enter the client's email to send it:")
+    if (!email) return
+    sendInvoice(inv.id, email.trim())
+    return
+  }
+  if (confirm(`Resend this invoice to ${inv.email}?`)) {
+    sendInvoice(inv.id)
+  }
+}
+
+async function deleteInvoice(id: number) {
+  if (!confirm('Delete this invoice?')) return
+  try {
+    await api.delete(`/invoices/${id}`)
+    invoices.value = invoices.value.filter(i => i.id !== id)
+  } catch (e) { console.error(e) }
 }
 
 // ─── view / print ─────────────────────────────────────────────────────────────
@@ -101,136 +214,175 @@ async function printInvoice() {
 
   const companyName    = s.company?.name || s.company?.company_name || 'Tej Printbrands'
   const logoUrl        = s.company?.logo_url || ''
-  const address        = s.contact?.address || ''
+  const address        = s.contact?.address || 'P.O. BOX 4052-00100, Nairobi'
   const phone          = s.contact?.phone || ''
   const phoneSecondary = s.contact?.phone_secondary || ''
   const email          = s.contact?.email || ''
-  const website        = s.contact?.website || ''
   const paybill        = s.business?.mpesa_shortcode || ''
   const paybillAcct    = s.business?.paybill_account || ''
 
+  const addrParts = address.split(',').map((a: string) => a.trim()).filter(Boolean)
+  const addr1 = addrParts[0] || ''
+  const addr2 = addrParts.slice(1).join(', ')
+  const contactLine = [phone, phoneSecondary].filter(Boolean).join(' / ') || email
+
   const fd = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
-  const q = inv.quotation
-  const itemRows = q?.items?.length
-    ? q.items.map(i => `
-      <tr>
-        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;">${i.description}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:center;">${i.quantity}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="4" style="padding:16px;text-align:center;color:#9CA3AF;font-style:italic;">${q?.service ?? 'Professional services'}</td></tr>`
+  const items = inv.items ?? []
+  const itemRows = items.length ? items.map(i => `
+        <tr>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;">${i.description}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">${i.quantity}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #00BCD4;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:14px;border-bottom:1px solid #00BCD4;color:#6B7280;font-style:italic;text-align:center;">${inv.service ?? 'Professional services'}</td></tr>`
+
+  // Pad with blank ruled rows so short invoices still fill out like a ruled pad.
+  const blankRowsNeeded = Math.max(0, 8 - items.length)
+  const blankRows = Array.from({ length: blankRowsNeeded })
+    .map(() => `<tr><td colspan="4" style="height:26px;border-bottom:1px solid #00BCD4;"></td></tr>`)
+    .join('')
+
+  const hasPayment = Number(inv.paid_amount ?? 0) > 0
+  const balanceDue = Math.max(0, Number(inv.amount) - Number(inv.paid_amount ?? 0))
 
   const pmtRows = (inv.payments ?? []).map(p => `
     <tr>
-      <td style="padding:6px 10px;font-size:12px;">${p.payment_number}</td>
-      <td style="padding:6px 10px;font-size:12px;text-transform:capitalize;">${p.method}</td>
-      <td style="padding:6px 10px;font-size:12px;font-family:monospace;">${p.reference ?? '-'}</td>
-      <td style="padding:6px 10px;font-size:12px;text-align:right;">Ksh ${Number(p.amount).toLocaleString()}</td>
-      <td style="padding:6px 10px;font-size:12px;">${p.paid_at ? fd(p.paid_at) : '-'}</td>
+      <td style="padding:5px 10px;font-size:11px;border-bottom:1px solid #f3f4f6;">${p.payment_number}</td>
+      <td style="padding:5px 10px;font-size:11px;border-bottom:1px solid #f3f4f6;">${p.method.charAt(0).toUpperCase() + p.method.slice(1)}</td>
+      <td style="padding:5px 10px;font-size:11px;border-bottom:1px solid #f3f4f6;">${p.paid_at ? fd(p.paid_at) : '-'}</td>
+      <td style="padding:5px 10px;font-size:11px;text-align:right;border-bottom:1px solid #f3f4f6;">Ksh ${Number(p.amount).toLocaleString()}</td>
     </tr>`).join('')
 
-  const balanceDue = Math.max(0, Number(inv.amount) - Number(inv.paid_amount ?? 0))
-  const statusColor = inv.status === 'paid' ? '#16a34a' : (inv.status === 'partial' ? '#d97706' : '#ea580c')
-  const statusBg    = inv.status === 'paid' ? '#dcfce7' : (inv.status === 'partial' ? '#fef3c7' : '#fff7ed')
-
   const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Invoice ${inv.invoice_number}</title>
+<html><head><meta charset="utf-8">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+<title>Invoice ${inv.invoice_number}</title>
 <style>
 @page{size:A4 portrait;margin:0}
-*{box-sizing:border-box;margin:0;padding:0}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}
 body{font-family:Arial,Helvetica,sans-serif;color:#1F2937;background:#fff}
 table{width:100%;border-collapse:collapse}
 </style>
 </head><body>
+<div style="border:4px solid #111;min-height:100vh;position:relative;overflow:hidden;">
 
-<!-- HEADER: company left, INVOICE right -->
-<div style="padding:28px 36px 22px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a237e;">
-  <div style="display:flex;align-items:center;gap:12px;">
-    ${logoUrl ? `<img src="${logoUrl}" style="width:55px;height:55px;object-fit:contain;" alt="">` : ''}
-    <div>
-      <div style="font-size:21px;font-weight:900;color:#1a237e;letter-spacing:2px;">${companyName.toUpperCase()}</div>
-      <div style="font-size:10px;color:#6B7280;margin-top:3px;">${address}</div>
-      <div style="font-size:10px;color:#6B7280;">${phone}${phoneSecondary ? ' / ' + phoneSecondary : ''}</div>
+<!-- ═══ HEADER: cyan swoosh on top, red drop-shadow trailing beneath it | white (right) ═══ -->
+<div style="position:relative;height:210px;overflow:hidden;background:#fff;">
+  <svg viewBox="0 0 794 210" width="100%" height="210" preserveAspectRatio="none" style="position:absolute;inset:0;">
+    <path d="M0,0 L640,0 C 480,10 500,90 380,130 C 300,158 200,190 150,210 L0,210 Z"
+          fill="#00BCD4" style="filter:drop-shadow(11px 9px 3px #F44336);"/>
+  </svg>
+
+  <!-- Logo + company (over the cyan curve, left) -->
+  <div style="position:absolute;left:26px;top:24px;display:flex;align-items:center;gap:16px;z-index:3;">
+    <div style="width:82px;height:82px;border-radius:50%;background:#fff;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2);">
+      ${logoUrl ? `<img src="${logoUrl}" style="width:74px;height:74px;object-fit:contain;" alt="">` : `<span style="font-size:28px;font-weight:900;color:#1a237e;">T</span>`}
+    </div>
+    <div style="color:#fff;">
+      <div style="font-size:16px;font-weight:800;letter-spacing:1px;">${companyName.toUpperCase()}</div>
+      <div style="font-size:11px;opacity:.95;margin-top:7px;line-height:1.6;">${addr1}${addr2 ? `<br>${addr2}` : ''}</div>
     </div>
   </div>
-  <div style="text-align:right;">
-    <div style="font-size:52px;font-weight:900;color:#e5e7eb;letter-spacing:6px;line-height:.9;">INVOICE</div>
-    <div style="font-size:14px;font-weight:700;color:#1a237e;margin-top:4px;">${inv.invoice_number}</div>
-    <div style="margin-top:6px;">
-      <span style="background:${statusBg};color:${statusColor};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;">${inv.status.toUpperCase()}</span>
-    </div>
-  </div>
-</div>
 
-<!-- DETAILS ROW -->
-<div style="display:flex;background:#f8f9fa;border-bottom:1px solid #e5e7eb;">
-  <div style="padding:16px 36px;border-right:1px solid #e5e7eb;flex:1;">
-    <div style="font-size:9px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Invoice To</div>
-    <div style="font-size:15px;font-weight:700;">${inv.client}</div>
-    <div style="font-size:12px;color:#6B7280;margin-top:2px;">${inv.email ?? ''}</div>
-  </div>
-  <div style="padding:16px 36px;min-width:200px;text-align:right;">
-    <div style="font-size:12px;margin-bottom:4px;"><span style="color:#9CA3AF;">Date:&nbsp;</span><strong>${fd(inv.created_at)}</strong></div>
-    ${inv.due_date ? `<div style="font-size:12px;margin-bottom:4px;"><span style="color:#9CA3AF;">Due:&nbsp;</span><strong>${fd(inv.due_date)}</strong></div>` : ''}
-  </div>
-</div>
-
-<!-- BODY -->
-<div style="padding:24px 36px;">
-
-  <!-- Items table -->
-  <table style="margin-bottom:20px;">
-    <thead>
-      <tr style="background:#1F2937;">
-        <th style="padding:10px 14px;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Description</th>
-        <th style="padding:10px 14px;color:#fff;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Qty</th>
-        <th style="padding:10px 14px;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Unit Price</th>
-        <th style="padding:10px 14px;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Total</th>
-      </tr>
-    </thead>
-    <tbody>${itemRows}</tbody>
-  </table>
-
-  <!-- Totals -->
-  <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
-    <table style="width:260px;">
-      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;">Amount</td><td style="padding:7px 14px;font-size:13px;text-align:right;">Ksh ${Number(inv.amount).toLocaleString()}</td></tr>
-      <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:7px 14px;font-size:13px;color:#16a34a;">Paid</td><td style="padding:7px 14px;font-size:13px;text-align:right;color:#16a34a;">Ksh ${Number(inv.paid_amount ?? 0).toLocaleString()}</td></tr>
-      <tr style="background:#1F2937;color:#fff;font-weight:700;"><td style="padding:10px 14px;">Balance Due</td><td style="padding:10px 14px;text-align:right;color:#00BCD4;">Ksh ${balanceDue.toLocaleString()}</td></tr>
+  <!-- INVOICE + date/invoice/due/bill-to table (right, anchored toward the bottom of the header) -->
+  <div style="position:absolute;right:30px;bottom:10px;width:300px;z-index:3;">
+    <div style="font-size:30px;font-weight:800;color:#1F2937;letter-spacing:2px;margin-bottom:8px;text-align:right;">INVOICE</div>
+    <table style="width:100%;font-size:11px;border-collapse:collapse;">
+      <tr><td style="border:1px solid #999;padding:4px 10px;width:90px;">Date:</td><td style="border:1px solid #999;padding:4px 10px;">${fd(inv.created_at)}</td></tr>
+      <tr><td style="border:1px solid #999;padding:4px 10px;border-top:none;">Invoice #:</td><td style="border:1px solid #999;padding:4px 10px;border-top:none;">${inv.invoice_number}</td></tr>
+      <tr><td style="border:1px solid #999;padding:4px 10px;border-top:none;">Due:</td><td style="border:1px solid #999;padding:4px 10px;border-top:none;">${inv.due_date ? fd(inv.due_date) : '—'}</td></tr>
+      <tr><td style="border:1px solid #999;padding:4px 10px;border-top:none;">Bill To:</td><td style="border:1px solid #999;padding:4px 10px;border-top:none;">${inv.client}</td></tr>
     </table>
   </div>
+</div>
 
-  <!-- Payment info -->
-  <div style="background:#EFF6FF;border-left:4px solid #00BCD4;border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:20px;">
-    <div style="font-size:10px;text-transform:uppercase;color:#1a237e;font-weight:700;letter-spacing:1.5px;margin-bottom:10px;">Payment Information</div>
-    <div style="display:flex;gap:40px;">
-      <div><div style="font-size:10px;color:#6B7280;text-transform:uppercase;">Paybill</div><div style="font-size:20px;font-weight:900;color:#1a237e;">${paybill || '&mdash;'}</div></div>
-      <div><div style="font-size:10px;color:#6B7280;text-transform:uppercase;">Account</div><div style="font-size:20px;font-weight:900;color:#1a237e;">${paybillAcct || '&mdash;'}</div></div>
+<!-- ═══ ITEMS TABLE ═══ -->
+<div style="padding:26px 26px 8px;">
+  <table>
+    <thead>
+      <tr style="background:#111;color:#fff;">
+        <th style="padding:10px 14px;text-align:left;font-size:12px;letter-spacing:.5px;">ITEM</th>
+        <th style="padding:10px 14px;text-align:center;font-size:12px;letter-spacing:.5px;">QTY</th>
+        <th style="padding:10px 8px;text-align:right;font-size:11px;line-height:1.3;">UNIT<br>PRICE</th>
+        <th style="padding:10px 14px;text-align:right;font-size:12px;letter-spacing:.5px;">TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}${blankRows}</tbody>
+  </table>
+
+  <!-- Right-aligned breakdown + amount due / balance due bar -->
+  <div style="display:flex;justify-content:flex-end;padding-right:8px;margin-top:8px;">
+    <table style="width:48%;">
+      ${inv.vat_included !== false ? `
+      <tr><td style="padding:4px 16px;font-size:12px;color:#6B7280;">Subtotal</td><td style="padding:4px 16px;font-size:12px;text-align:right;color:#1F2937;">Ksh ${Number(inv.subtotal ?? inv.amount).toLocaleString()}</td></tr>
+      <tr><td style="padding:4px 16px;font-size:12px;color:#6B7280;${hasPayment ? '' : 'border-bottom:1px solid #e5e7eb;'}">VAT (16%)</td><td style="padding:4px 16px;font-size:12px;text-align:right;color:#1F2937;${hasPayment ? '' : 'border-bottom:1px solid #e5e7eb;'}">Ksh ${Number(inv.tax ?? 0).toLocaleString()}</td></tr>` : ''}
+      ${hasPayment ? `<tr><td style="padding:4px 16px;font-size:12px;color:#6B7280;">Amount Paid</td><td style="padding:4px 16px;font-size:12px;text-align:right;color:#16a34a;">- Ksh ${Number(inv.paid_amount).toLocaleString()}</td></tr>` : ''}
+    </table>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:6px;padding-right:8px;">
+    <div style="width:48%;background:#111;color:#fff;font-weight:700;font-size:14px;padding:10px 16px;display:flex;justify-content:space-between;">
+      <span>${hasPayment ? 'Balance Due' : 'Amount Due'}${inv.vat_included === false ? ' (VAT Exempt)' : ''}</span>
+      <span style="color:#00BCD4;">Ksh ${balanceDue.toLocaleString()}</span>
     </div>
   </div>
 
-  <!-- Payment history -->
+  ${inv.terms ? `<div style="margin-top:14px;font-size:11px;color:#6B7280;padding-top:10px;border-top:1px solid #e5e7eb;"><strong>Terms &amp; Conditions:</strong> ${inv.terms}</div>` : ''}
+
   ${pmtRows ? `
-  <div style="margin-bottom:16px;">
-    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Payment History</div>
-    <table style="font-size:12px;">
-      <thead><tr style="background:#f9fafb;"><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Ref #</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Method</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Code</th><th style="padding:8px 10px;text-align:right;font-size:11px;color:#6B7280;">Amount</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#6B7280;">Date</th></tr></thead>
+  <div style="margin-top:16px;">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:bold;color:#374151;text-transform:uppercase;letter-spacing:.5px;">Payment History</p>
+    <table>
+      <thead>
+        <tr>
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:#9CA3AF;border-bottom:1px solid #e5e7eb;">Payment #</th>
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:#9CA3AF;border-bottom:1px solid #e5e7eb;">Method</th>
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:#9CA3AF;border-bottom:1px solid #e5e7eb;">Date</th>
+          <th style="padding:5px 10px;text-align:right;font-size:10px;color:#9CA3AF;border-bottom:1px solid #e5e7eb;">Amount</th>
+        </tr>
+      </thead>
       <tbody>${pmtRows}</tbody>
     </table>
   </div>` : ''}
 </div>
 
-<!-- FOOTER -->
-<div style="background:#1F2937;padding:12px 36px;display:flex;justify-content:space-between;align-items:center;">
-  <div style="color:rgba(255,255,255,.6);font-size:11px;">${companyName} &middot; Thank you for your business</div>
-  <div style="color:rgba(255,255,255,.8);font-size:11px;text-align:right;">
-    <div style="color:#fff;font-weight:600;">${email}</div>
-    ${website ? `<div style="color:#fff;">${website}</div>` : ''}
+<!-- ═══ PAYMENT INFO ═══ -->
+<div style="padding:20px 26px 0;">
+  <div style="display:inline-block;">
+    <div style="background:#111;color:#fff;padding:6px 16px;font-size:13px;font-weight:700;display:inline-block;margin-bottom:4px;">Payment Info:</div>
+    <div style="font-size:13px;padding:3px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
+    <div style="font-size:13px;padding:3px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>
   </div>
 </div>
 
+<!-- ═══ FOOTER: curved swoosh (mirrored, anchored right) with social icons ═══ -->
+<div style="position:absolute;left:0;right:0;bottom:0;height:64px;overflow:visible;">
+  <svg viewBox="0 0 794 64" width="100%" height="64" preserveAspectRatio="none" style="position:absolute;inset:0;overflow:visible;">
+    <path d="M794,64 L154,64 C 314,61 294,37 414,24 C 494,16 594,6 644,0 L794,0 Z"
+          fill="#00BCD4" style="filter:drop-shadow(-11px -9px 3px #F44336);"/>
+  </svg>
+  <div style="position:absolute;right:20px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;gap:8px;">
+    <div style="width:30px;height:30px;border-radius:50%;background:#F44336;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+    </div>
+    <div style="width:30px;height:30px;border-radius:50%;background:#1877F2;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="13" height="13" fill="white" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+    </div>
+    <div style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="13" height="13" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+    </div>
+    <div style="width:30px;height:30px;border-radius:50%;background:#25D366;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 004.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2z"/></svg>
+    </div>
+    <div style="color:#fff;margin-left:6px;">
+      <div style="font-size:13px;font-weight:800;line-height:1.3;">${companyName.toLowerCase()}</div>
+      <div style="font-size:13px;font-weight:800;line-height:1.3;">${contactLine}</div>
+    </div>
+  </div>
+</div>
+
+</div>
 </body></html>`
 
   const win = window.open('', '_blank')
@@ -296,7 +448,7 @@ async function submitInvoicePayment() {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function statusClass(s: string) {
-  const m: Record<string, string> = { paid: 'bg-green-100 text-green-700 border-green-200', unpaid: 'bg-orange-100 text-orange-700 border-orange-200', overdue: 'bg-red-100 text-red-700 border-red-200', partial: 'bg-blue-100 text-blue-700 border-blue-200' }
+  const m: Record<string, string> = { draft: 'bg-gray-100 text-gray-600 border-gray-200', paid: 'bg-green-100 text-green-700 border-green-200', unpaid: 'bg-orange-100 text-orange-700 border-orange-200', overdue: 'bg-red-100 text-red-700 border-red-200', partial: 'bg-blue-100 text-blue-700 border-blue-200' }
   return m[s] ?? 'bg-gray-100 text-gray-700 border-gray-200'
 }
 function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
@@ -336,10 +488,14 @@ onMounted(async () => {
 
     <template v-else>
       <!-- Stat Cards -->
-      <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 xl:grid-cols-5 gap-4">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div class="text-2xl font-bold text-gray-900">{{ invoices.length }}</div>
           <div class="text-sm text-gray-500 mt-1">Total Invoices</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div class="text-2xl font-bold text-gray-500">{{ countStatus('draft') }}</div>
+          <div class="text-sm text-gray-500 mt-1">Draft</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <div class="text-2xl font-bold text-green-600">{{ countStatus('paid') }}</div>
@@ -366,6 +522,7 @@ onMounted(async () => {
         </div>
         <select v-model="statusFilter" class="border border-gray-300 rounded-xl px-3 py-2 outline-none focus:border-cyan-500 text-sm bg-white">
           <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
           <option value="paid">Paid</option>
           <option value="unpaid">Unpaid</option>
           <option value="partial">Partial</option>
@@ -408,6 +565,7 @@ onMounted(async () => {
                     @change="updateInvoiceStatus(inv, ($event.target as HTMLSelectElement).value)"
                     :disabled="updatingInvId === inv.id"
                     :class="['px-2 py-1 rounded-lg text-xs font-medium border cursor-pointer outline-none transition-all disabled:opacity-60', statusClass(inv.status)]">
+                    <option value="draft">Draft</option>
                     <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
                     <option value="paid">Paid</option>
@@ -420,11 +578,21 @@ onMounted(async () => {
                     <button @click="openView(inv)" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="View">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </button>
+                    <button @click="openEdit(inv)" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Edit">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                    <button v-if="inv.status !== 'draft'" @click="resendInvoice(inv)" :disabled="sendingId === inv.id"
+                      class="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors disabled:opacity-50" title="Resend to client">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
                     <button @click="printInvoice(); viewInv = inv" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Print">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     </button>
-                    <button v-if="inv.status !== 'paid'" @click="openPayModal(inv)" class="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Record Payment">
+                    <button v-if="inv.status !== 'paid' && inv.status !== 'draft'" @click="openPayModal(inv)" class="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Record Payment">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </button>
+                    <button @click="deleteInvoice(inv.id)" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Delete">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>
                   </div>
                 </td>
@@ -435,26 +603,26 @@ onMounted(async () => {
       </div>
     </template>
 
-    <!-- ─── Create Invoice Modal ──────────────────────────────────────────────── -->
+    <!-- ─── Create / Edit Invoice Modal ────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showCreate" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="showCreate = false">
-          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 class="text-base font-bold text-gray-900">Create Invoice</h3>
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+              <h3 class="text-base font-bold text-gray-900">{{ editingInvId ? 'Edit Invoice' : 'Create Invoice' }}</h3>
               <button @click="showCreate = false" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
-            <div class="p-6 space-y-4">
+            <div class="p-6 overflow-y-auto flex-1 space-y-5">
               <div v-if="createError" class="rounded-xl p-3 bg-red-50 text-red-600 border border-red-200 text-sm">{{ createError }}</div>
 
               <!-- From quotation -->
-              <div v-if="quotations.length">
+              <div v-if="!editingInvId && quotations.length">
                 <label class="block text-sm font-medium text-gray-700 mb-1">From Quotation (optional)</label>
                 <select v-model.number="form.quotation_id" @change="onQuotationSelect"
                   class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 bg-white transition-all">
-                  <option :value="0">None — enter client manually</option>
+                  <option :value="0">None — enter details manually</option>
                   <option v-for="q in quotations" :key="q.id" :value="q.id">{{ q.quote_number }} · {{ q.client }} · Ksh {{ fmt(q.total) }}</option>
                 </select>
               </div>
@@ -471,8 +639,8 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh) <span class="text-red-500">*</span></label>
-                  <input v-model.number="form.amount" type="number" min="1" placeholder="0"
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Service / Description</label>
+                  <input v-model="form.service" type="text" placeholder="e.g. Business Cards & Flyers"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
@@ -481,20 +649,96 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
               </div>
+
+              <!-- Line items -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea v-model="form.notes" rows="2" placeholder="Additional notes..."
+                <div class="flex items-center justify-between mb-2">
+                  <label class="block text-sm font-medium text-gray-700">Line Items <span class="text-red-500">*</span></label>
+                  <button type="button" @click="addItem" class="inline-flex items-center gap-1 text-xs font-semibold text-cyan-600 hover:text-cyan-700">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    Add Item
+                  </button>
+                </div>
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
+                        <th class="px-3 py-2 text-left">Description</th>
+                        <th class="px-3 py-2 text-center w-20">Qty</th>
+                        <th class="px-3 py-2 text-right w-32">Unit Price</th>
+                        <th class="px-3 py-2 text-right w-32">Total</th>
+                        <th class="px-2 py-2 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                      <tr v-for="(item, i) in form.items" :key="i">
+                        <td class="px-2 py-1.5">
+                          <input v-model="item.description" placeholder="Item description" class="w-full border-0 focus:ring-0 text-sm px-1 py-1 outline-none"/>
+                        </td>
+                        <td class="px-2 py-1.5">
+                          <input v-model.number="item.qty" type="number" min="1" class="w-full border-0 focus:ring-0 text-sm text-center px-1 py-1 outline-none"/>
+                        </td>
+                        <td class="px-2 py-1.5">
+                          <input v-model.number="item.unit_price" type="number" min="0" class="w-full border-0 focus:ring-0 text-sm text-right px-1 py-1 outline-none"/>
+                        </td>
+                        <td class="px-3 py-1.5 text-xs font-semibold text-gray-800 text-right">Ksh {{ (item.qty * item.unit_price).toLocaleString() }}</td>
+                        <td class="px-2 py-1.5">
+                          <button v-if="form.items.length > 1" @click="removeItem(i)" class="text-gray-400 hover:text-red-500 transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <!-- Totals -->
+                <div class="mt-3 flex flex-col items-end gap-1 text-sm">
+                  <div class="flex items-center gap-12 text-gray-600">
+                    <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="checkbox" v-model="includeVat" class="accent-cyan-500">
+                      VAT (16%)
+                    </label>
+                    <span>Ksh {{ vat.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex gap-12 text-gray-600">
+                    <span>Subtotal</span><span>Ksh {{ subtotal.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex gap-10 font-bold text-gray-900 border-t border-gray-200 pt-1 mt-1">
+                    <span>Total</span><span>Ksh {{ total.toLocaleString() }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Terms -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Terms & Notes</label>
+                <textarea v-model="form.terms" rows="3" placeholder="Payment terms, validity, notes..."
                   class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all resize-none"></textarea>
               </div>
+              <p class="text-xs text-gray-400">
+                <template v-if="editingInvId">
+                  After saving, you'll be asked whether to email the updated invoice to the client.
+                </template>
+                <template v-else>
+                  "Save &amp; Send" also emails a PDF copy of this invoice to the client's address above.
+                </template>
+              </p>
             </div>
-            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-3">
-              <button @click="showCreate = false" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancel</button>
-              <button @click="submitCreate" :disabled="saving"
-                class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
-                style="background:#1F2937;">
-                <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                Create Invoice
-              </button>
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-between shrink-0">
+              <p class="text-sm font-bold text-gray-900">Total: <span style="color:#00bcd4">Ksh {{ total.toLocaleString() }}</span></p>
+              <div class="flex gap-2">
+                <button @click="showCreate = false" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancel</button>
+                <button v-if="!editingInvId" @click="submitCreate('draft')" :disabled="saving"
+                  class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors disabled:opacity-50">
+                  Save Draft
+                </button>
+                <button @click="editingInvId ? submitEditAndMaybeShare() : submitCreateAndSend()" :disabled="saving"
+                  class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
+                  style="background:#1F2937;">
+                  <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  {{ editingInvId ? 'Save Changes' : 'Save & Send' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -534,16 +778,24 @@ onMounted(async () => {
                     @change="updateInvoiceStatus(viewInv, ($event.target as HTMLSelectElement).value)"
                     :disabled="updatingInvId === viewInv.id"
                     :class="['px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer outline-none disabled:opacity-60', statusClass(viewInv.status)]">
+                    <option value="draft">Draft</option>
                     <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
                     <option value="paid">Paid</option>
                     <option value="overdue">Overdue</option>
                   </select>
-                  <button v-if="viewInv.status !== 'paid'" @click="openPayModal(viewInv)"
-                    class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white bg-emerald-600 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    Record Payment
-                  </button>
+                  <div class="flex gap-2">
+                    <button v-if="viewInv.status !== 'draft'" @click="resendInvoice(viewInv)" :disabled="sendingId === viewInv.id"
+                      class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white flex items-center gap-1.5 disabled:opacity-50" style="background:#00BCD4;">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                      Resend
+                    </button>
+                    <button v-if="viewInv.status !== 'paid' && viewInv.status !== 'draft'" @click="openPayModal(viewInv)"
+                      class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white bg-emerald-600 flex items-center gap-1.5">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                      Record Payment
+                    </button>
+                  </div>
                 </div>
                 <!-- Client + dates -->
                 <div class="bg-gray-50 rounded-xl p-4 mb-4 text-sm grid grid-cols-2 gap-3">
@@ -558,8 +810,8 @@ onMounted(async () => {
                     <p v-if="viewInv.due_date" class="text-xs text-gray-500 mt-1">Due: {{ fmtDate(viewInv.due_date) }}</p>
                   </div>
                 </div>
-                <!-- Quotation items if linked -->
-                <div v-if="viewInv.quotation?.items?.length" class="mb-4">
+                <!-- Line items -->
+                <div v-if="viewInv.items?.length" class="mb-4">
                   <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Line Items</p>
                   <table class="w-full text-sm border border-gray-100 rounded-xl overflow-hidden">
                     <thead class="bg-gray-50">
@@ -570,7 +822,7 @@ onMounted(async () => {
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">
-                      <tr v-for="item in viewInv.quotation.items" :key="item.id">
+                      <tr v-for="item in viewInv.items" :key="item.id">
                         <td class="px-4 py-2.5 text-gray-700">{{ item.description }}</td>
                         <td class="px-4 py-2.5 text-center text-gray-700">{{ item.quantity }}</td>
                         <td class="px-4 py-2.5 text-right font-medium text-gray-900">Ksh {{ fmt(item.total) }}</td>
@@ -580,9 +832,15 @@ onMounted(async () => {
                 </div>
                 <!-- Totals -->
                 <div class="flex flex-col items-end gap-1.5 text-sm mb-4">
+                  <div v-if="viewInv.vat_included !== false" class="flex gap-12 text-gray-600"><span>Subtotal</span><span>Ksh {{ fmt(viewInv.subtotal ?? viewInv.amount) }}</span></div>
+                  <div v-if="viewInv.vat_included !== false" class="flex gap-12 text-gray-600"><span>VAT (16%)</span><span>Ksh {{ fmt(viewInv.tax ?? 0) }}</span></div>
                   <div class="flex gap-12 text-gray-600"><span>Invoice Amount</span><span>Ksh {{ fmt(viewInv.amount) }}</span></div>
                   <div class="flex gap-12 text-green-600"><span>Amount Paid</span><span>Ksh {{ fmt(viewInv.paid_amount ?? 0) }}</span></div>
                   <div class="flex gap-10 font-bold text-gray-900 border-t border-gray-200 pt-1.5"><span>Balance Due</span><span style="color:#00BCD4;">Ksh {{ fmt(Math.max(0, viewInv.amount - (viewInv.paid_amount ?? 0))) }}</span></div>
+                </div>
+                <!-- Terms -->
+                <div v-if="viewInv.terms" class="mb-4 text-xs text-gray-500 border-t border-gray-100 pt-3">
+                  <span class="font-semibold text-gray-700">Terms &amp; Conditions:</span> {{ viewInv.terms }}
                 </div>
                 <!-- Payment history -->
                 <div v-if="viewInv.payments?.length">
@@ -608,7 +866,7 @@ onMounted(async () => {
     <!-- ─── Record Payment Modal ─────────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="fade">
-        <div v-if="showPayModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="showPayModal = false">
+        <div v-if="showPayModal" class="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="showPayModal = false">
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
