@@ -248,11 +248,12 @@ async function printReceipt(pmt: Payment) {
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Receipt ${receiptNo}</title>
 <style>
-@page{size:A5 landscape;margin:12mm 14mm}
+@page{size:A5 landscape;margin:10mm 12mm}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;font-size:13px}
 </style>
 </head><body>
+<div style="padding:16px 20px 22px;">
 
 <!-- TOP HEADER -->
 <div style="display:flex;align-items:stretch;border:2px solid #1a237e;margin-bottom:14px;">
@@ -330,6 +331,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;font-size
   Graphic Design &bull; T-Shirts &bull; General Branding &bull; Digital Printing &bull; Signage &bull; Promotional Items
 </div>
 
+</div>
 </body></html>`
 
   const win = window.open('', '_blank')

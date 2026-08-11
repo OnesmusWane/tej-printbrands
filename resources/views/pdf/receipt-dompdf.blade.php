@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Receipt {{ $receiptNo }}</title>
 <style>
-    @page { size: A5 landscape; margin: 12mm 14mm; }
+    @page { size: A5 landscape; margin: 10mm 12mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; color: #111; background: #fff; font-size: 13px; }
     table { border-collapse: collapse; width: 100%; }
@@ -12,6 +12,7 @@
 </style>
 </head>
 <body>
+<div style="padding: 16px 20px 22px;">
 
 {{-- TOP HEADER --}}
 <table style="border: 2px solid #1a237e; margin-bottom: 14px;">
@@ -110,5 +111,6 @@
     </tr>
 </table>
 
+</div>
 </body>
 </html>
