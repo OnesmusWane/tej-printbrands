@@ -80,7 +80,7 @@
                                 <div
                                     class="gallery-main-slide absolute inset-0 cursor-zoom-in {{ $i === 0 ? '' : 'hidden' }}"
                                     data-gallery-index="{{ $i }}"
-                                    onclick="openLightbox('{{ addslashes($img) }}', '{{ addslashes($service->title) }}')"
+                                    onclick="openLightbox({{ json_encode($serviceImages) }}, {{ $i }}, '{{ addslashes($service->title) }}')"
                                     title="Click to enlarge"
                                 >
                                     <x-responsive-image :src="$img" :alt="$service->title" variant="hero" sizes="(min-width: 1024px) 60vw, 100vw" :eager="$i === 0" class="h-full w-full object-cover" />
@@ -165,7 +165,7 @@
                                         {{-- Multi-image gallery: main image left, up to 3 stacked on right --}}
                                         <div class="flex h-48 overflow-hidden">
                                             <div class="{{ count($subImages) > 1 ? 'w-3/5 shrink-0' : 'relative w-full' }} overflow-hidden cursor-zoom-in"
-                                                 onclick="openLightbox('{{ addslashes($subImages[0]) }}', '{{ addslashes($subTitle) }}')"
+                                                 onclick="openLightbox({{ json_encode($subImages) }}, 0, '{{ addslashes($subTitle) }}')"
                                                  title="Click to enlarge">
                                                 <x-responsive-image :src="$subImages[0]" :alt="$subTitle" variant="card" sizes="(min-width: 640px) 40vw, 60vw" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                                 @if (count($subImages) === 1)
@@ -178,7 +178,7 @@
                                                 <div class="flex flex-1 flex-col gap-0.5 ml-0.5 overflow-hidden">
                                                     @foreach (array_slice($subImages, 1, 3) as $si => $imgUrl)
                                                         <div class="relative flex-1 overflow-hidden cursor-zoom-in"
-                                                             onclick="openLightbox('{{ addslashes($imgUrl) }}', '{{ addslashes($subTitle) }}')"
+                                                             onclick="openLightbox({{ json_encode($subImages) }}, {{ $si + 1 }}, '{{ addslashes($subTitle) }}')"
                                                              title="Click to enlarge">
                                                             <x-responsive-image :src="$imgUrl" :alt="$subTitle" variant="thumb" sizes="120px" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300" />
                                                             @if ($si === 2 && count($subImages) > 4)
@@ -208,9 +208,9 @@
                                                 @endif
                                                 @if (!empty($subImages))
                                                     <div class="flex gap-2 overflow-x-auto pb-1">
-                                                        @foreach ($subImages as $imgUrl)
+                                                        @foreach ($subImages as $ti => $imgUrl)
                                                             <div class="h-16 w-16 shrink-0 overflow-hidden rounded-xl cursor-zoom-in border border-slate-100 shadow-sm"
-                                                                 onclick="openLightbox('{{ addslashes($imgUrl) }}', '{{ addslashes($subTitle) }}')"
+                                                                 onclick="openLightbox({{ json_encode($subImages) }}, {{ $ti }}, '{{ addslashes($subTitle) }}')"
                                                                  title="Click to enlarge">
                                                                 <x-responsive-image :src="$imgUrl" :alt="$subTitle" variant="thumb" sizes="64px" class="h-full w-full object-cover hover:scale-110 transition-transform duration-200" />
                                                             </div>
@@ -238,7 +238,7 @@
                                                                 {{-- Split gallery at h-36 --}}
                                                                 <div class="flex h-36 overflow-hidden">
                                                                     <div class="{{ count($nsImages) > 1 ? 'w-3/5 shrink-0' : 'w-full' }} overflow-hidden cursor-zoom-in"
-                                                                         onclick="openLightbox('{{ addslashes($nsImages[0]) }}', '{{ addslashes($nsTitle) }}')"
+                                                                         onclick="openLightbox({{ json_encode($nsImages) }}, 0, '{{ addslashes($nsTitle) }}')"
                                                                          title="Click to enlarge">
                                                                         <x-responsive-image :src="$nsImages[0]" :alt="$nsTitle" variant="card" sizes="(min-width: 640px) 25vw, 45vw" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300" />
                                                                     </div>
@@ -246,7 +246,7 @@
                                                                         <div class="flex flex-1 flex-col gap-0.5 ml-0.5 overflow-hidden">
                                                                             @foreach (array_slice($nsImages, 1, 3) as $nsi => $nsImgUrl)
                                                                                 <div class="relative flex-1 overflow-hidden cursor-zoom-in"
-                                                                                     onclick="openLightbox('{{ addslashes($nsImgUrl) }}', '{{ addslashes($nsTitle) }}')"
+                                                                                     onclick="openLightbox({{ json_encode($nsImages) }}, {{ $nsi + 1 }}, '{{ addslashes($nsTitle) }}')"
                                                                                      title="Click to enlarge">
                                                                                     <x-responsive-image :src="$nsImgUrl" :alt="$nsTitle" variant="thumb" sizes="100px" class="h-full w-full object-cover hover:scale-105 transition-transform duration-300" />
                                                                                     @if ($nsi === 2 && count($nsImages) > 4)
@@ -372,24 +372,77 @@
         };
 
         /* ── Lightbox ── */
-        window.openLightbox = function (src, alt) {
+        window.openLightbox = function (images, startIndex, alt) {
+            images = Array.isArray(images) ? images : [images];
+            images = images.filter(function (u) { return typeof u === 'string' && u; });
+            if (!images.length) return;
+            var index = Math.max(0, Math.min(startIndex || 0, images.length - 1));
+
             var overlay = document.createElement('div');
             overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:1rem;';
+
             var img = document.createElement('img');
-            img.src = src;
             img.alt = alt || '';
             img.style.cssText = 'max-width:100%;max-height:90vh;border-radius:12px;object-fit:contain;box-shadow:0 25px 60px rgba(0,0,0,0.5);';
+
             var close = document.createElement('button');
             close.innerHTML = '&times;';
-            close.style.cssText = 'position:absolute;top:1rem;right:1.25rem;color:#fff;font-size:2rem;line-height:1;background:none;border:none;cursor:pointer;opacity:0.8;';
-            close.addEventListener('click', function (e) { e.stopPropagation(); document.body.removeChild(overlay); document.body.style.overflow = ''; });
+            close.style.cssText = 'position:absolute;top:1rem;right:1.25rem;color:#fff;font-size:2rem;line-height:1;background:none;border:none;cursor:pointer;opacity:0.8;z-index:1;';
+
+            var counter = document.createElement('div');
+            counter.style.cssText = 'position:absolute;bottom:1rem;left:50%;transform:translateX(-50%);color:#fff;font-size:0.75rem;font-weight:600;background:rgba(0,0,0,0.55);padding:0.25rem 0.75rem;border-radius:999px;pointer-events:none;';
+
+            function render() {
+                img.src = images[index];
+                counter.textContent = (index + 1) + ' / ' + images.length;
+            }
+
+            function go(dir) {
+                index = (index + dir + images.length) % images.length;
+                render();
+            }
+
+            function makeNavBtn(dir) {
+                var btn = document.createElement('button');
+                btn.setAttribute('aria-label', dir < 0 ? 'Previous image' : 'Next image');
+                btn.innerHTML = dir < 0
+                    ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>'
+                    : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>';
+                btn.style.cssText = 'position:absolute;top:50%;' + (dir < 0 ? 'left:0.75rem;' : 'right:0.75rem;') + 'transform:translateY(-50%);color:#fff;background:rgba(255,255,255,0.12);border:none;border-radius:9999px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.15s;z-index:1;';
+                btn.addEventListener('mouseenter', function () { btn.style.background = 'rgba(255,255,255,0.25)'; });
+                btn.addEventListener('mouseleave', function () { btn.style.background = 'rgba(255,255,255,0.12)'; });
+                btn.addEventListener('click', function (e) { e.stopPropagation(); go(dir); });
+                return btn;
+            }
+
+            function teardown() {
+                if (document.body.contains(overlay)) document.body.removeChild(overlay);
+                document.body.style.overflow = '';
+                document.removeEventListener('keydown', onKey);
+            }
+
+            function onKey(e) {
+                if (e.key === 'Escape') { teardown(); return; }
+                if (images.length > 1) {
+                    if (e.key === 'ArrowLeft') go(-1);
+                    if (e.key === 'ArrowRight') go(1);
+                }
+            }
+
+            render();
             overlay.appendChild(img);
             overlay.appendChild(close);
-            overlay.addEventListener('click', function () { document.body.removeChild(overlay); document.body.style.overflow = ''; });
+            if (images.length > 1) {
+                overlay.appendChild(makeNavBtn(-1));
+                overlay.appendChild(makeNavBtn(1));
+                overlay.appendChild(counter);
+            }
+            close.addEventListener('click', function (e) { e.stopPropagation(); teardown(); });
+            overlay.addEventListener('click', teardown);
             img.addEventListener('click', function (e) { e.stopPropagation(); });
+
             document.body.style.overflow = 'hidden';
             document.body.appendChild(overlay);
-            function onKey(e) { if (e.key === 'Escape' && document.body.contains(overlay)) { document.body.removeChild(overlay); document.body.style.overflow = ''; document.removeEventListener('keydown', onKey); } }
             document.addEventListener('keydown', onKey);
         };
     })();
