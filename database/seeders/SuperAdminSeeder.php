@@ -12,7 +12,7 @@ class SuperAdminSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'onesmuswane@gmail.com'],
             [
-                'name'       => 'Onesmus Wane',
+                'name'       => 'Onesmus Wane', 
                 'password'   => bcrypt('Admin@1234'),
                 'is_admin'   => true,
                 'role'       => 'super_admin',
