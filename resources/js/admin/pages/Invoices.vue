@@ -30,6 +30,9 @@ const editingInvId  = ref<number | null>(null)
 const showPayModal  = ref(false)
 const paySaving     = ref(false)
 const payError      = ref('')
+const payType       = ref<'full' | 'partial'>('full')
+const payRemaining  = ref(0)
+const editingPaymentId = ref<number | null>(null)
 const payForm = ref({
   invoice_id: 0 as number,
   client: '', amount: 0, method: 'cash' as string, reference: '', date: new Date().toISOString().slice(0, 10),
@@ -402,12 +405,31 @@ async function updateInvoiceStatus(inv: Invoice, status: string) {
   finally { updatingInvId.value = null }
 }
 
+// Marking an invoice "Paid" or "Partial" from the status dropdown always routes
+// through the payment modal instead — status alone doesn't say how much was
+// actually paid, so we need an amount (full or partial) to record a real payment.
+function onStatusSelect(inv: Invoice, status: string) {
+  if (status === 'paid') {
+    openPayModal(inv, 'full')
+    return
+  }
+  if (status === 'partial') {
+    openPayModal(inv, 'partial')
+    return
+  }
+  updateInvoiceStatus(inv, status)
+}
+
 // ─── pay modal ────────────────────────────────────────────────────────────────
-function openPayModal(inv: Invoice) {
+function openPayModal(inv: Invoice, type: 'full' | 'partial' = 'full') {
+  const remaining = Math.max(0, Number(inv.amount) - Number(inv.paid_amount ?? 0))
+  editingPaymentId.value = null
+  payType.value = type
+  payRemaining.value = remaining
   payForm.value = {
     invoice_id: inv.id,
     client:     inv.client,
-    amount:     Math.max(0, Number(inv.amount) - Number(inv.paid_amount ?? 0)),
+    amount:     type === 'partial' ? 0 : remaining,
     method:     'cash',
     reference:  '',
     date:       new Date().toISOString().slice(0, 10),
@@ -416,29 +438,81 @@ function openPayModal(inv: Invoice) {
   showPayModal.value = true
 }
 
+// Edit an already-recorded payment's amount/method/reference/date directly —
+// distinct from openPayModal, which always records a brand-new payment.
+function openEditPayment(inv: Invoice, p: Payment) {
+  editingPaymentId.value = p.id
+  payType.value = 'partial' // irrelevant while editing; toggle is hidden
+  payRemaining.value = Math.max(0, Number(inv.amount) - Number(inv.paid_amount ?? 0))
+  payForm.value = {
+    invoice_id: inv.id,
+    client:     inv.client,
+    amount:     Number(p.amount),
+    method:     p.method,
+    reference:  p.reference ?? '',
+    date:       (p.paid_at ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+  }
+  payError.value    = ''
+  showPayModal.value = true
+}
+
+function setPayType(type: 'full' | 'partial') {
+  payType.value = type
+  if (type === 'full') {
+    payForm.value.amount = payRemaining.value
+  } else if (payForm.value.amount >= payRemaining.value) {
+    payForm.value.amount = 0
+  }
+}
+
+async function refreshInvoice(id: number) {
+  try {
+    const { data } = await api.get(`/invoices/${id}`)
+    const updated = data.data ?? data
+    const idx = invoices.value.findIndex(i => i.id === id)
+    if (idx !== -1) invoices.value[idx] = { ...invoices.value[idx], ...updated }
+    if (viewInv.value?.id === id) viewInv.value = updated
+  } catch (e) { console.error(e) }
+}
+
 async function submitInvoicePayment() {
   if (!payForm.value.amount) { payError.value = 'Amount is required.'; return }
+  if (!editingPaymentId.value && payType.value === 'partial' && payForm.value.amount >= payRemaining.value) {
+    payError.value = `Partial amount must be less than the balance due (Ksh ${fmt(payRemaining.value)}). Use "Full Amount" to pay it off completely.`
+    return
+  }
   paySaving.value = true; payError.value = ''
   try {
-    const payload: any = {
-      invoice_id: payForm.value.invoice_id,
-      client:     payForm.value.client,
-      amount:     payForm.value.amount,
-      method:     payForm.value.method,
-      reference:  payForm.value.reference || null,
-      paid_at:    payForm.value.date,
-    }
-    await api.post('/payments', payload)
-    // Update invoice paid_amount + status locally
-    const idx = invoices.value.findIndex(i => i.id === payForm.value.invoice_id)
-    if (idx !== -1) {
-      const newPaid = Number(invoices.value[idx].paid_amount ?? 0) + Number(payForm.value.amount)
-      invoices.value[idx].paid_amount = newPaid
-      invoices.value[idx].status = newPaid >= Number(invoices.value[idx].amount) ? 'paid' : 'partial'
-    }
-    if (viewInv.value?.id === payForm.value.invoice_id) {
-      const newPaid = Number(viewInv.value.paid_amount ?? 0) + Number(payForm.value.amount)
-      viewInv.value = { ...viewInv.value!, paid_amount: newPaid, status: newPaid >= Number(viewInv.value.amount) ? 'paid' : 'partial' }
+    if (editingPaymentId.value) {
+      await api.patch(`/payments/${editingPaymentId.value}`, {
+        client:    payForm.value.client,
+        amount:    payForm.value.amount,
+        method:    payForm.value.method,
+        reference: payForm.value.reference || null,
+        paid_at:   payForm.value.date,
+      })
+      await refreshInvoice(payForm.value.invoice_id)
+    } else {
+      const payload: any = {
+        invoice_id: payForm.value.invoice_id,
+        client:     payForm.value.client,
+        amount:     payForm.value.amount,
+        method:     payForm.value.method,
+        reference:  payForm.value.reference || null,
+        paid_at:    payForm.value.date,
+      }
+      await api.post('/payments', payload)
+      // Update invoice paid_amount + status locally
+      const idx = invoices.value.findIndex(i => i.id === payForm.value.invoice_id)
+      if (idx !== -1) {
+        const newPaid = Number(invoices.value[idx].paid_amount ?? 0) + Number(payForm.value.amount)
+        invoices.value[idx].paid_amount = newPaid
+        invoices.value[idx].status = newPaid >= Number(invoices.value[idx].amount) ? 'paid' : 'partial'
+      }
+      if (viewInv.value?.id === payForm.value.invoice_id) {
+        const newPaid = Number(viewInv.value.paid_amount ?? 0) + Number(payForm.value.amount)
+        viewInv.value = { ...viewInv.value!, paid_amount: newPaid, status: newPaid >= Number(viewInv.value.amount) ? 'paid' : 'partial' }
+      }
     }
     showPayModal.value = false
   } catch (e: any) {
@@ -562,9 +636,10 @@ onMounted(async () => {
                 <td class="px-6 py-4 text-sm text-green-600 font-medium">Ksh {{ fmt(inv.paid_amount ?? 0) }}</td>
                 <td class="px-6 py-4">
                   <select :value="inv.status"
-                    @change="updateInvoiceStatus(inv, ($event.target as HTMLSelectElement).value)"
-                    :disabled="updatingInvId === inv.id"
-                    :class="['px-2 py-1 rounded-lg text-xs font-medium border cursor-pointer outline-none transition-all disabled:opacity-60', statusClass(inv.status)]">
+                    @change="onStatusSelect(inv, ($event.target as HTMLSelectElement).value)"
+                    :disabled="updatingInvId === inv.id || inv.status === 'paid'"
+                    :title="inv.status === 'paid' ? 'Invoice is fully paid — status is locked' : ''"
+                    :class="['px-2 py-1 rounded-lg text-xs font-medium border cursor-pointer outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed', statusClass(inv.status)]">
                     <option value="draft">Draft</option>
                     <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
@@ -775,9 +850,10 @@ onMounted(async () => {
                 <!-- Status + actions -->
                 <div class="flex items-center justify-between mb-5">
                   <select :value="viewInv.status"
-                    @change="updateInvoiceStatus(viewInv, ($event.target as HTMLSelectElement).value)"
-                    :disabled="updatingInvId === viewInv.id"
-                    :class="['px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer outline-none disabled:opacity-60', statusClass(viewInv.status)]">
+                    @change="onStatusSelect(viewInv, ($event.target as HTMLSelectElement).value)"
+                    :disabled="updatingInvId === viewInv.id || viewInv.status === 'paid'"
+                    :title="viewInv.status === 'paid' ? 'Invoice is fully paid — status is locked' : ''"
+                    :class="['px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer outline-none disabled:opacity-60 disabled:cursor-not-allowed', statusClass(viewInv.status)]">
                     <option value="draft">Draft</option>
                     <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
@@ -853,7 +929,13 @@ onMounted(async () => {
                         <span class="ml-2 text-gray-700 capitalize">{{ p.method }}</span>
                         <span v-if="p.reference" class="ml-2 text-xs text-gray-400">{{ p.reference }}</span>
                       </div>
-                      <span class="font-semibold text-green-600">Ksh {{ fmt(p.amount) }}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="font-semibold text-green-600">Ksh {{ fmt(p.amount) }}</span>
+                        <button @click="openEditPayment(viewInv, p)" title="Update amount paid"
+                          class="p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -870,9 +952,9 @@ onMounted(async () => {
           <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h3 class="text-base font-bold text-gray-900">Record Payment</h3>
+                <h3 class="text-base font-bold text-gray-900">{{ editingPaymentId ? 'Edit Payment' : 'Record Payment' }}</h3>
                 <p class="text-xs text-gray-500 mt-0.5">Balance due:
-                  <span class="font-semibold" style="color:#00BCD4;">Ksh {{ Number(payForm.amount || 0).toLocaleString() }}</span>
+                  <span class="font-semibold" style="color:#00BCD4;">Ksh {{ fmt(payRemaining) }}</span>
                 </p>
               </div>
               <button @click="showPayModal = false" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
@@ -881,6 +963,21 @@ onMounted(async () => {
             </div>
             <div class="p-6 space-y-4">
               <div v-if="payError" class="rounded-xl p-3 bg-red-50 text-red-600 border border-red-200 text-sm">{{ payError }}</div>
+
+              <div v-if="!editingPaymentId">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Payment Amount</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" @click="setPayType('full')"
+                    :class="['py-2 rounded-xl border text-xs font-semibold transition-all', payType === 'full' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50']">
+                    Full Amount (Ksh {{ fmt(payRemaining) }})
+                  </button>
+                  <button type="button" @click="setPayType('partial')"
+                    :class="['py-2 rounded-xl border text-xs font-semibold transition-all', payType === 'partial' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50']">
+                    Partial Amount
+                  </button>
+                </div>
+              </div>
+
               <div class="grid grid-cols-2 gap-3">
                 <div class="col-span-2">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Client</label>
@@ -888,9 +985,10 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh) <span class="text-red-500">*</span></label>
-                  <input v-model.number="payForm.amount" type="number" min="0.01" step="0.01" placeholder="0"
-                    class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid (Ksh) <span class="text-red-500">*</span></label>
+                  <input v-model.number="payForm.amount" type="number" min="0.01" :max="payType === 'partial' ? payRemaining : undefined" step="0.01" placeholder="0"
+                    :disabled="payType === 'full'"
+                    class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all disabled:bg-gray-100 disabled:text-gray-500"/>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
@@ -924,7 +1022,7 @@ onMounted(async () => {
                 class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
                 style="background:#1F2937;">
                 <svg v-if="paySaving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                {{ paySaving ? 'Processing…' : 'Record Payment' }}
+                {{ paySaving ? 'Saving…' : (editingPaymentId ? 'Save Changes' : 'Record Payment') }}
               </button>
             </div>
           </div>

@@ -51,27 +51,25 @@ class AdminDashboardController extends Controller
                     ->whereYear('created_at', $m->year)
                     ->whereMonth('created_at', $m->month)
                     ->sum('amount')
-                + DailyLedgerEntry::where('type', 'sale')
-                    ->whereYear('entry_date', $m->year)
+                + DailyLedgerEntry::whereYear('entry_date', $m->year)
                     ->whereMonth('entry_date', $m->month)
-                    ->sum('amount')
+                    ->sum('income')
             ) / 1000;
 
             $exp = (int) (
-                DailyLedgerEntry::where('type', 'expense')
-                    ->whereYear('entry_date', $m->year)
+                DailyLedgerEntry::whereYear('entry_date', $m->year)
                     ->whereMonth('entry_date', $m->month)
-                    ->sum('amount')
+                    ->sum('expense')
             ) / 1000;
 
             return ['label' => $m->format('M'), 'revenue' => $rev, 'expenses' => $exp];
         })->values();
 
         // Daily ledger: today's and this-month's manually logged sales/expenses
-        $todaySales    = (int) DailyLedgerEntry::where('type', 'sale')->whereDate('entry_date', today())->sum('amount');
-        $todayExpenses = (int) DailyLedgerEntry::where('type', 'expense')->whereDate('entry_date', today())->sum('amount');
-        $monthSales    = (int) DailyLedgerEntry::where('type', 'sale')->whereYear('entry_date', now()->year)->whereMonth('entry_date', now()->month)->sum('amount');
-        $monthExpenses = (int) DailyLedgerEntry::where('type', 'expense')->whereYear('entry_date', now()->year)->whereMonth('entry_date', now()->month)->sum('amount');
+        $todaySales    = (int) DailyLedgerEntry::whereDate('entry_date', today())->sum('income');
+        $todayExpenses = (int) DailyLedgerEntry::whereDate('entry_date', today())->sum('expense');
+        $monthSales    = (int) DailyLedgerEntry::whereYear('entry_date', now()->year)->whereMonth('entry_date', now()->month)->sum('income');
+        $monthExpenses = (int) DailyLedgerEntry::whereYear('entry_date', now()->year)->whereMonth('entry_date', now()->month)->sum('expense');
 
         // Service distribution from order items
         $categories = ['Graphic Design', 'Printing', 'Branding', 'Signage', 'Promotional'];

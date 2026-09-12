@@ -84,6 +84,10 @@ class AdminResourceController extends Controller
 
         if ($resource === 'daily-ledger-entries') {
             $data['recorded_by'] = $request->user()->id;
+
+            if ($error = $this->ledgerAmountError($data)) {
+                return response()->json(['message' => $error], 422);
+            }
         }
 
         $model = $this->model($resource)::create($data);
@@ -99,9 +103,35 @@ class AdminResourceController extends Controller
     public function update(AdminResourceRequest $request, string $resource, int $id): JsonResponse
     {
         $model = $this->find($resource, $id);
-        $model->update($request->validated());
+        $data = $request->validated();
+
+        if ($resource === 'daily-ledger-entries') {
+            // Merge onto the existing record so a partial update (e.g. only
+            // editing the category) doesn't trip the "at least one amount" check.
+            $merged = array_merge(['income' => $model->income, 'expense' => $model->expense], $data);
+
+            if ($error = $this->ledgerAmountError($merged)) {
+                return response()->json(['message' => $error], 422);
+            }
+        }
+
+        $model->update($data);
 
         return response()->json($model->refresh());
+    }
+
+    /**
+     * A ledger entry must carry an income amount, an expense amount, or both —
+     * never neither.
+     */
+    private function ledgerAmountError(array $data): ?string
+    {
+        $income = $data['income'] ?? null;
+        $expense = $data['expense'] ?? null;
+
+        return (empty($income) && empty($expense))
+            ? 'Enter an income amount, an expense amount, or both.'
+            : null;
     }
 
     public function destroy(string $resource, int $id): JsonResponse

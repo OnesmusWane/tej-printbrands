@@ -5,10 +5,11 @@ import { useResource } from '../composables/useResource'
 interface LedgerEntry {
     id: number
     entry_date: string
-    type: 'sale' | 'expense'
     category: string | null
     description: string | null
-    amount: number
+    income: number | null
+    expense: number | null
+    net?: number
     created_at: string
 }
 
@@ -30,7 +31,8 @@ const rangeMode    = ref(false)
 const rangeStart   = ref(daysAgoStr(6))
 const rangeEnd     = ref(todayStr())
 const showModal    = ref(false)
-const editing      = ref<Partial<LedgerEntry>>({})
+const modalError   = ref('')
+const editing      = ref<Record<string, any>>({})
 
 const filteredEntries = computed(() => {
     const list = rangeMode.value
@@ -43,41 +45,9 @@ const filteredEntries = computed(() => {
     })
 })
 
-const daySales    = computed(() => filteredEntries.value.filter(e => e.type === 'sale').reduce((sum, e) => sum + Number(e.amount), 0))
-const dayExpenses = computed(() => filteredEntries.value.filter(e => e.type === 'expense').reduce((sum, e) => sum + Number(e.amount), 0))
-const dayNet      = computed(() => daySales.value - dayExpenses.value)
-
-interface DayGroup {
-    date: string
-    entries: LedgerEntry[]
-    sales: number
-    expenses: number
-    net: number
-}
-
-// filteredEntries is already sorted newest-day-first / newest-time-first, and Map
-// preserves insertion order, so groups come out in that same order for free.
-const groupedByDay = computed<DayGroup[]>(() => {
-    const map = new Map<string, LedgerEntry[]>()
-    for (const e of filteredEntries.value) {
-        const bucket = map.get(e.entry_date)
-        if (bucket) bucket.push(e)
-        else map.set(e.entry_date, [e])
-    }
-    return Array.from(map.entries()).map(([date, entries]) => {
-        const sales = entries.filter(e => e.type === 'sale').reduce((sum, e) => sum + Number(e.amount), 0)
-        const expenses = entries.filter(e => e.type === 'expense').reduce((sum, e) => sum + Number(e.amount), 0)
-        return { date, entries, sales, expenses, net: sales - expenses }
-    })
-})
-
-const expandedDates = ref<Set<string>>(new Set())
-function toggleDay(date: string) {
-    const next = new Set(expandedDates.value)
-    if (next.has(date)) next.delete(date)
-    else next.add(date)
-    expandedDates.value = next
-}
+const dayIncome  = computed(() => filteredEntries.value.reduce((sum, e) => sum + Number(e.income ?? 0), 0))
+const dayExpense = computed(() => filteredEntries.value.reduce((sum, e) => sum + Number(e.expense ?? 0), 0))
+const dayNet     = computed(() => dayIncome.value - dayExpense.value)
 
 function isToday(): boolean {
     return selectedDate.value === todayStr()
@@ -93,19 +63,34 @@ const periodLabel = computed(() => {
     return `(${fmtDateShort(rangeStart.value)} – ${fmtDateShort(rangeEnd.value)})`
 })
 
-function openNew(type: 'sale' | 'expense') {
+function openNew() {
     const defaultDate = rangeMode.value ? rangeEnd.value : selectedDate.value
-    editing.value = { entry_date: defaultDate, type, category: '', description: '', amount: 0 }
+    editing.value = { entry_date: defaultDate, category: '', description: '', income: '', expense: '' }
+    modalError.value = ''
     showModal.value = true
 }
 
 function openEdit(e: LedgerEntry) {
-    editing.value = { ...e }
+    editing.value = { ...e, income: e.income ?? '', expense: e.expense ?? '' }
+    modalError.value = ''
     showModal.value = true
 }
 
+function netOf(e: LedgerEntry): number {
+    return Number(e.income ?? 0) - Number(e.expense ?? 0)
+}
+
 async function submit() {
-    const payload = { ...editing.value, amount: Number(editing.value.amount) || 0 }
+    const income = editing.value.income === '' || editing.value.income == null ? null : Number(editing.value.income)
+    const expense = editing.value.expense === '' || editing.value.expense == null ? null : Number(editing.value.expense)
+
+    if (!income && !expense) {
+        modalError.value = 'Enter an income amount, an expense amount, or both.'
+        return
+    }
+
+    modalError.value = ''
+    const payload = { ...editing.value, income, expense }
     const ok = await save(payload as any, editing.value.id)
     if (ok) {
         showModal.value = false
@@ -133,16 +118,11 @@ onMounted(() => load({ per_page: 1000 }))
                 <h1 class="text-2xl font-bold text-dark">Daily Sales &amp; Expenses</h1>
                 <p class="text-sm text-gray-500 mt-1">Log cash sales and expenses day by day.</p>
             </div>
-            <div class="flex items-center gap-2">
-                <button @click="openNew('sale')"
-                        class="rounded-lg px-4 py-2 text-sm font-bold text-white bg-green-600 hover:bg-green-700 transition-colors">
-                    + Log Sale
-                </button>
-                <button @click="openNew('expense')"
-                        class="rounded-lg px-4 py-2 text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">
-                    + Log Expense
-                </button>
-            </div>
+            <button @click="openNew"
+                    class="rounded-lg px-4 py-2 text-sm font-bold text-white transition-colors"
+                    style="background:#00BCD4;">
+                + Add Record
+            </button>
         </div>
 
         <!-- Date filter -->
@@ -181,124 +161,56 @@ onMounted(() => load({ per_page: 1000 }))
         <!-- Summary cards -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Sales {{ periodLabel }}</p>
-                <p class="text-2xl font-bold text-green-600">{{ fmt(daySales) }}</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Income {{ periodLabel }}</p>
+                <p class="text-2xl font-bold text-green-600">{{ fmt(dayIncome) }}</p>
             </div>
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Expenses {{ periodLabel }}</p>
-                <p class="text-2xl font-bold text-red-500">{{ fmt(dayExpenses) }}</p>
+                <p class="text-2xl font-bold text-red-500">{{ fmt(dayExpense) }}</p>
             </div>
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Net</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{{ dayNet >= 0 ? 'Profit' : 'Loss' }}</p>
                 <p class="text-2xl font-bold" :class="dayNet >= 0 ? 'text-gray-900' : 'text-red-500'">{{ fmt(dayNet) }}</p>
             </div>
         </div>
 
         <div v-if="loading" class="text-gray-400">Loading…</div>
 
-        <!-- Date Range: cumulative-per-day rows, expandable to individual entries -->
-        <div v-if="!loading && rangeMode" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <!-- Records: flat list, newest first -->
+        <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="bg-gray-50 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                        <th class="px-4 py-3">Date</th>
-                        <th class="px-4 py-3">Entries</th>
-                        <th class="px-4 py-3">Sales</th>
-                        <th class="px-4 py-3">Expenses</th>
-                        <th class="px-4 py-3">Net</th>
-                        <th class="px-4 py-3 w-10"></th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-50">
-                    <template v-for="day in groupedByDay" :key="day.date">
-                        <tr class="hover:bg-gray-50 transition-colors cursor-pointer select-none" @click="toggleDay(day.date)">
-                            <td class="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{{ fmtDateShort(day.date) }}</td>
-                            <td class="px-4 py-3 text-gray-500">{{ day.entries.length }}</td>
-                            <td class="px-4 py-3 font-bold text-green-600">{{ fmt(day.sales) }}</td>
-                            <td class="px-4 py-3 font-bold text-red-500">{{ fmt(day.expenses) }}</td>
-                            <td class="px-4 py-3 font-bold" :class="day.net >= 0 ? 'text-gray-900' : 'text-red-500'">{{ fmt(day.net) }}</td>
-                            <td class="px-4 py-3 text-right text-gray-400">
-                                <svg :class="['w-4 h-4 transition-transform inline-block', expandedDates.has(day.date) ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                                </svg>
-                            </td>
-                        </tr>
-                        <tr v-if="expandedDates.has(day.date)">
-                            <td colspan="6" class="p-0 bg-gray-50/60">
-                                <table class="w-full text-sm">
-                                    <thead>
-                                        <tr class="text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                                            <th class="px-4 py-2 pl-12">Time</th>
-                                            <th class="px-4 py-2">Type</th>
-                                            <th class="px-4 py-2">Category</th>
-                                            <th class="px-4 py-2">Description</th>
-                                            <th class="px-4 py-2">Amount</th>
-                                            <th class="px-4 py-2"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100">
-                                        <tr v-for="e in day.entries" :key="e.id" class="hover:bg-white transition-colors">
-                                            <td class="px-4 py-2.5 pl-12 text-gray-500 whitespace-nowrap">{{ fmtTime(e.created_at) }}</td>
-                                            <td class="px-4 py-2.5">
-                                                <span :class="['rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase', e.type === 'sale' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600']">
-                                                    {{ e.type }}
-                                                </span>
-                                            </td>
-                                            <td class="px-4 py-2.5 text-gray-700">{{ e.category || '-' }}</td>
-                                            <td class="px-4 py-2.5 text-gray-500">{{ e.description || '-' }}</td>
-                                            <td class="px-4 py-2.5 font-bold" :class="e.type === 'sale' ? 'text-green-600' : 'text-red-500'">
-                                                {{ e.type === 'sale' ? '+' : '-' }}{{ fmt(e.amount) }}
-                                            </td>
-                                            <td class="px-4 py-2.5 text-right">
-                                                <button @click="openEdit(e)" class="mr-2 text-xs font-medium text-gray-500 hover:text-gray-700">Edit</button>
-                                                <button @click="remove(e.id)" class="text-xs font-medium text-red-500 hover:text-red-700">Delete</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </td>
-                        </tr>
-                    </template>
-                    <tr v-if="groupedByDay.length === 0">
-                        <td colspan="6" class="px-4 py-10 text-center text-gray-400">No entries logged in this date range yet.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Single Day: flat breakdown of individual entries -->
-        <div v-else-if="!loading" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="bg-gray-50 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
+                        <th v-if="rangeMode" class="px-4 py-3">Date</th>
                         <th class="px-4 py-3">Time</th>
-                        <th class="px-4 py-3">Type</th>
                         <th class="px-4 py-3">Category</th>
                         <th class="px-4 py-3">Description</th>
-                        <th class="px-4 py-3">Amount</th>
+                        <th class="px-4 py-3">Income</th>
+                        <th class="px-4 py-3">Expense</th>
+                        <th class="px-4 py-3">Profit / Loss</th>
                         <th class="px-4 py-3"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
                     <tr v-for="e in filteredEntries" :key="e.id" class="hover:bg-gray-50 transition-colors">
+                        <td v-if="rangeMode" class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ fmtDateShort(e.entry_date) }}</td>
                         <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ fmtTime(e.created_at) }}</td>
-                        <td class="px-4 py-3">
-                            <span :class="['rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase', e.type === 'sale' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600']">
-                                {{ e.type }}
-                            </span>
-                        </td>
                         <td class="px-4 py-3 text-gray-700">{{ e.category || '-' }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ e.description || '-' }}</td>
-                        <td class="px-4 py-3 font-bold" :class="e.type === 'sale' ? 'text-green-600' : 'text-red-500'">
-                            {{ e.type === 'sale' ? '+' : '-' }}{{ fmt(e.amount) }}
+                        <td class="px-4 py-3 font-semibold text-green-600">{{ e.income ? fmt(e.income) : '-' }}</td>
+                        <td class="px-4 py-3 font-semibold text-red-500">{{ e.expense ? fmt(e.expense) : '-' }}</td>
+                        <td class="px-4 py-3 font-bold" :class="netOf(e) >= 0 ? 'text-gray-900' : 'text-red-500'">
+                            {{ netOf(e) >= 0 ? '+' : '' }}{{ fmt(netOf(e)) }}
                         </td>
-                        <td class="px-4 py-3 text-right">
+                        <td class="px-4 py-3 text-right whitespace-nowrap">
                             <button @click="openEdit(e)" class="mr-2 text-xs font-medium text-gray-500 hover:text-gray-700">Edit</button>
                             <button @click="remove(e.id)" class="text-xs font-medium text-red-500 hover:text-red-700">Delete</button>
                         </td>
                     </tr>
                     <tr v-if="filteredEntries.length === 0">
-                        <td colspan="6" class="px-4 py-10 text-center text-gray-400">No entries logged for this day yet.</td>
+                        <td :colspan="rangeMode ? 8 : 7" class="px-4 py-10 text-center text-gray-400">
+                            {{ rangeMode ? 'No records logged in this date range yet.' : 'No records logged for this day yet.' }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -313,32 +225,32 @@ onMounted(() => load({ per_page: 1000 }))
                     <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-100">
                         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                             <h2 class="text-lg font-extrabold text-gray-900">
-                                {{ editing.id ? 'Edit Entry' : (editing.type === 'sale' ? 'Log Sale' : 'Log Expense') }}
+                                {{ editing.id ? 'Edit Record' : 'Add Record' }}
                             </h2>
                             <button @click="showModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
                         </div>
 
                         <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
-                            <div class="grid grid-cols-2 gap-3">
-                                <button type="button" @click="editing.type = 'sale'"
-                                        :class="['rounded-lg px-3 py-2.5 text-sm font-bold border transition-colors', editing.type === 'sale' ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-gray-600']">
-                                    Sale
-                                </button>
-                                <button type="button" @click="editing.type = 'expense'"
-                                        :class="['rounded-lg px-3 py-2.5 text-sm font-bold border transition-colors', editing.type === 'expense' ? 'bg-red-500 border-red-500 text-white' : 'border-gray-300 text-gray-600']">
-                                    Expense
-                                </button>
-                            </div>
+                            <div v-if="modalError" class="rounded-xl p-3 bg-red-50 text-red-600 border border-red-200 text-sm">{{ modalError }}</div>
+
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
                                 <input type="date" v-model="editing.entry_date" required
                                        class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Ksh)</label>
-                                <input type="number" v-model.number="editing.amount" required min="0"
-                                       class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Income (Ksh)</label>
+                                    <input type="number" v-model.number="editing.income" min="0" step="0.01" placeholder="0"
+                                           class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Expense (Ksh)</label>
+                                    <input type="number" v-model.number="editing.expense" min="0" step="0.01" placeholder="0"
+                                           class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                                </div>
                             </div>
+                            <p class="text-xs text-gray-400 -mt-2">Enter income, expense, or both — at least one is required.</p>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
                                 <input v-model="editing.category" list="ledger-category-suggestions" placeholder="e.g. Walk-in Sale, Fuel, Rent"
@@ -364,7 +276,7 @@ onMounted(() => load({ per_page: 1000 }))
                             <button @click="submit" :disabled="saving"
                                     class="rounded-lg px-5 py-2 text-sm font-bold text-white disabled:opacity-50 transition-colors"
                                     style="background:#1f2937">
-                                {{ saving ? 'Saving…' : 'Save Entry' }}
+                                {{ saving ? 'Saving…' : 'Save Record' }}
                             </button>
                         </div>
                     </div>
