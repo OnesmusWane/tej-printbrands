@@ -526,6 +526,12 @@ function statusClass(s: string) {
   return m[s] ?? 'bg-gray-100 text-gray-700 border-gray-200'
 }
 function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
+// A "paid" invoice can still have a balance due (e.g. its status was set
+// directly before payments were tracked) — go by the actual numbers, not the
+// status label, when deciding whether Record Payment should be offered.
+function hasBalanceDue(inv: Invoice): boolean {
+  return inv.status !== 'draft' && Number(inv.paid_amount ?? 0) < Number(inv.amount)
+}
 function fmt(v: any) { return Number(v ?? 0).toLocaleString() }
 function fmtDate(d?: string) { if (!d) return '-'; return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }
 
@@ -663,7 +669,7 @@ onMounted(async () => {
                     <button @click="printInvoice(); viewInv = inv" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Print">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     </button>
-                    <button v-if="inv.status !== 'paid' && inv.status !== 'draft'" @click="openPayModal(inv)" class="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Record Payment">
+                    <button v-if="hasBalanceDue(inv)" @click="openPayModal(inv)" class="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Record Payment">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </button>
                     <button @click="deleteInvoice(inv.id)" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Delete">
@@ -866,7 +872,7 @@ onMounted(async () => {
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                       Resend
                     </button>
-                    <button v-if="viewInv.status !== 'paid' && viewInv.status !== 'draft'" @click="openPayModal(viewInv)"
+                    <button v-if="hasBalanceDue(viewInv)" @click="openPayModal(viewInv)"
                       class="text-xs px-3 py-1.5 rounded-lg font-semibold text-white bg-emerald-600 flex items-center gap-1.5">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                       Record Payment
