@@ -10,7 +10,7 @@ class DailyLedgerEntry extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['entry_date', 'category', 'description', 'income', 'expense', 'recorded_by'];
+    protected $fillable = ['entry_date', 'item_name', 'category', 'description', 'income', 'expense', 'recorded_by'];
 
     protected $appends = ['net'];
 

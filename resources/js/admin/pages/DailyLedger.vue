@@ -5,6 +5,7 @@ import { useResource } from '../composables/useResource'
 interface LedgerEntry {
     id: number
     entry_date: string
+    item_name: string | null
     category: string | null
     description: string | null
     income: number | null
@@ -65,7 +66,7 @@ const periodLabel = computed(() => {
 
 function openNew() {
     const defaultDate = rangeMode.value ? rangeEnd.value : selectedDate.value
-    editing.value = { entry_date: defaultDate, category: '', description: '', income: '', expense: '' }
+    editing.value = { entry_date: defaultDate, item_name: '', category: '', description: '', income: '', expense: '' }
     modalError.value = ''
     showModal.value = true
 }
@@ -183,6 +184,7 @@ onMounted(() => load({ per_page: 1000 }))
                     <tr class="bg-gray-50 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
                         <th v-if="rangeMode" class="px-4 py-3">Date</th>
                         <th class="px-4 py-3">Time</th>
+                        <th class="px-4 py-3">Item</th>
                         <th class="px-4 py-3">Category</th>
                         <th class="px-4 py-3">Description</th>
                         <th class="px-4 py-3">Income</th>
@@ -195,6 +197,7 @@ onMounted(() => load({ per_page: 1000 }))
                     <tr v-for="e in filteredEntries" :key="e.id" class="hover:bg-gray-50 transition-colors">
                         <td v-if="rangeMode" class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ fmtDateShort(e.entry_date) }}</td>
                         <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ fmtTime(e.created_at) }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-900">{{ e.item_name || '-' }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ e.category || '-' }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ e.description || '-' }}</td>
                         <td class="px-4 py-3 font-semibold text-green-600">{{ e.income ? fmt(e.income) : '-' }}</td>
@@ -208,7 +211,7 @@ onMounted(() => load({ per_page: 1000 }))
                         </td>
                     </tr>
                     <tr v-if="filteredEntries.length === 0">
-                        <td :colspan="rangeMode ? 8 : 7" class="px-4 py-10 text-center text-gray-400">
+                        <td :colspan="rangeMode ? 9 : 8" class="px-4 py-10 text-center text-gray-400">
                             {{ rangeMode ? 'No records logged in this date range yet.' : 'No records logged for this day yet.' }}
                         </td>
                     </tr>
@@ -233,6 +236,11 @@ onMounted(() => load({ per_page: 1000 }))
                         <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
                             <div v-if="modalError" class="rounded-xl p-3 bg-red-50 text-red-600 border border-red-200 text-sm">{{ modalError }}</div>
 
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Item <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <input v-model="editing.item_name" placeholder="e.g. Business Cards, Flyers 500pcs"
+                                       class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all">
+                            </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
                                 <input type="date" v-model="editing.entry_date" required
