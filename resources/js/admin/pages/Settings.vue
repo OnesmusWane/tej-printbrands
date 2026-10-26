@@ -9,7 +9,7 @@ const toast = useToastStore()
 const company  = ref({ company_name: '', tagline: '', description: '', logo_url: '', favicon_url: '' })
 const contact  = ref({ email: '', phone: '', phone_secondary: '', support_email: '', hours: '', address: '', website: '', whatsapp_number: '', whatsapp_message: '' })
 const socials  = ref({ facebook: '', instagram: '', twitter: '', linkedin: '', youtube: '', tiktok: '' })
-const business = ref({ currency: 'KES', tax_rate: '', mpesa_shortcode: '', paybill_account: '', mpesa_env: 'sandbox', mpesa_consumer_key: '', mpesa_consumer_secret: '', mpesa_passkey: '' })
+const business = ref({ currency: 'KES', tax_rate: '', mpesa_type: 'paybill', mpesa_shortcode: '', paybill_account: '', mpesa_env: 'sandbox', mpesa_consumer_key: '', mpesa_consumer_secret: '', mpesa_passkey: '' })
 const password = ref({ current_password: '', password: '', password_confirmation: '' })
 const passwordErrors = ref<Record<string, string[]>>({})
 const showMpesaKeys = ref(false)
@@ -271,8 +271,22 @@ onMounted(load)
                             M-Pesa STK Push
                         </p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Payment Type</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button type="button" @click="business.mpesa_type = 'paybill'"
+                                        :class="['py-2.5 rounded-xl border text-sm font-semibold transition-all', business.mpesa_type !== 'till' ? 'border-cyan-500 bg-cyan-50 text-cyan-700' : 'border-gray-200 text-gray-600 hover:border-gray-300']">
+                                        Paybill
+                                    </button>
+                                    <button type="button" @click="business.mpesa_type = 'till'"
+                                        :class="['py-2.5 rounded-xl border text-sm font-semibold transition-all', business.mpesa_type === 'till' ? 'border-cyan-500 bg-cyan-50 text-cyan-700' : 'border-gray-200 text-gray-600 hover:border-gray-300']">
+                                        Till Number
+                                    </button>
+                                </div>
+                                <p class="text-[11px] text-gray-400 mt-1">Controls how payment info is labelled on quotations and invoices.</p>
+                            </div>
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Paybill / Till Number</label>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ business.mpesa_type === 'till' ? 'Till Number' : 'Paybill Number' }}</label>
                                 <input v-model="business.mpesa_shortcode" placeholder="174379" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"/>
                             </div>
                             <div>
@@ -282,7 +296,7 @@ onMounted(load)
                                     <option value="live">Live (production)</option>
                                 </select>
                             </div>
-                            <div class="md:col-span-2">
+                            <div v-if="business.mpesa_type !== 'till'" class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-gray-600 mb-1.5">Paybill Account Number</label>
                                 <input v-model="business.paybill_account" placeholder="e.g. 5001411001" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"/>
                                 <p class="text-[11px] text-gray-400 mt-1">Account number shown on printed quotations and invoices.</p>

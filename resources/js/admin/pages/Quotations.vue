@@ -74,6 +74,7 @@ const form = ref({
     items: [defaultItem()] as FormItem[],
 });
 const includeVat = ref(true);
+const downloadInsteadOfSend = ref(false);
 
 const subtotal = computed(() =>
     form.value.items.reduce((s, i) => s + i.qty * i.unit_price, 0),
@@ -99,6 +100,7 @@ function openCreate() {
         items: [defaultItem()],
     };
     includeVat.value = true;
+    downloadInsteadOfSend.value = false;
     createError.value = "";
     showCreate.value = true;
 }
@@ -123,9 +125,9 @@ function openEdit(q: Quotation) {
     showCreate.value = true;
 }
 
-async function submitCreate(status?: string): Promise<Quotation | null> {
-    if (!form.value.client || !form.value.email) {
-        createError.value = "Client name and email are required.";
+async function submitCreate(status?: string, extra: Record<string, any> = {}): Promise<Quotation | null> {
+    if (!form.value.client) {
+        createError.value = "Client name is required.";
         return null;
     }
     saving.value = true;
@@ -133,7 +135,7 @@ async function submitCreate(status?: string): Promise<Quotation | null> {
     try {
         const payload: Record<string, any> = {
             client: form.value.client,
-            email: form.value.email,
+            email: form.value.email || null,
             service: form.value.service,
             terms: form.value.terms,
             vat_included: includeVat.value,
@@ -142,6 +144,7 @@ async function submitCreate(status?: string): Promise<Quotation | null> {
                 quantity: i.qty,
                 unit_price: i.unit_price,
             })),
+            ...extra,
         };
 
         let record: Quotation;
@@ -181,9 +184,40 @@ async function submitCreate(status?: string): Promise<Quotation | null> {
 }
 
 async function submitCreateAndSend() {
+    if (!form.value.email) {
+        createError.value = "Email is required to send the quotation — or check \"Download instead\" below.";
+        return;
+    }
     const record = await submitCreate("pending");
     if (record) {
         await buildAndPrint(record);
+    }
+}
+
+async function downloadQuotationPdf(q: Quotation) {
+    const resp = await api.get(`/quotations/${q.id}/download`, { responseType: "blob" });
+    const url = URL.createObjectURL(new Blob([resp.data], { type: "application/pdf" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Quotation-${q.quote_number}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function submitCreateAndDownload() {
+    const record = await submitCreate("pending", { skip_email: true });
+    if (record) {
+        await downloadQuotationPdf(record);
+    }
+}
+
+async function submitCreateAndDeliver() {
+    if (downloadInsteadOfSend.value) {
+        await submitCreateAndDownload();
+    } else {
+        await submitCreateAndSend();
     }
 }
 
@@ -263,6 +297,7 @@ async function buildAndPrint(q: Quotation) {
     const phone          = s.contact?.phone || '';
     const phoneSecondary = s.contact?.phone_secondary || '';
     const email          = s.contact?.email || '';
+    const isTill         = (s.business?.mpesa_type || 'paybill') === 'till';
     const paybill        = s.business?.mpesa_shortcode || '';
     const paybillAcct    = s.business?.paybill_account || '';
 
@@ -276,7 +311,7 @@ async function buildAndPrint(q: Quotation) {
     const itemRows = (q.items ?? []).map(i => `
         <tr>
           <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;">${i.description}</td>
-          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">${i.quantity}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">${fmtQty(i.quantity)}</td>
           <td style="padding:9px 8px;border-bottom:1px solid #00BCD4;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
           <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
         </tr>`).join('');
@@ -368,8 +403,10 @@ table{width:100%;border-collapse:collapse}
 <div style="padding:20px 26px 0;">
   <div style="display:inline-block;">
     <div style="background:#111;color:#fff;padding:6px 16px;font-size:13px;font-weight:700;display:inline-block;margin-bottom:4px;">Payment Info:</div>
-    <div style="font-size:13px;padding:3px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
-    <div style="font-size:13px;padding:3px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>
+    ${isTill
+      ? `<div style="font-size:13px;padding:3px 2px;">Till Number: <strong>${paybill || '&mdash;'}</strong></div>`
+      : `<div style="font-size:13px;padding:3px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
+    <div style="font-size:13px;padding:3px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>`}
   </div>
 </div>
 
@@ -475,6 +512,11 @@ function capitalize(s: string) {
 }
 function fmt(v: any) {
     return Number(v ?? 0).toLocaleString();
+}
+// Quantities arrive as decimal strings (e.g. "5.00") — show "5" for whole
+// numbers and "45.89" for fractional ones instead of always showing ".00".
+function fmtQty(v: any) {
+    return Number(v ?? 0).toString();
 }
 function fmtDate(d?: string) {
     if (!d) return "";
@@ -1191,9 +1233,7 @@ onMounted(async () => {
                                     <label
                                         class="block text-sm font-medium text-gray-700 mb-1"
                                         >Client Email
-                                        <span class="text-red-500"
-                                            >*</span
-                                        ></label
+                                        <span class="text-gray-400 font-normal">(required to send)</span></label
                                     >
                                     <input
                                         v-model="form.email"
@@ -1300,7 +1340,8 @@ onMounted(async () => {
                                                             item.qty
                                                         "
                                                         type="number"
-                                                        min="1"
+                                                        min="0.01"
+                                                        step="0.01"
                                                         class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center outline-none focus:border-cyan-500"
                                                     />
                                                 </td>
@@ -1406,10 +1447,18 @@ onMounted(async () => {
                                 <template v-if="editingQuoteId">
                                     After saving, you'll be asked whether to email the updated quotation to the client.
                                 </template>
+                                <template v-else-if="downloadInsteadOfSend">
+                                    "Save &amp; Download" saves the quotation and downloads a PDF copy — nothing is emailed.
+                                </template>
                                 <template v-else>
                                     "Save &amp; Send" also emails a PDF copy of this quotation to the client's address above.
                                 </template>
                             </p>
+                            <label v-if="!editingQuoteId" class="flex items-center gap-2 cursor-pointer select-none">
+                                <input type="checkbox" v-model="downloadInsteadOfSend"
+                                       class="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500/40">
+                                <span class="text-sm text-gray-600">Download instead of emailing</span>
+                            </label>
                         </div>
                         <div
                             class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-between shrink-0"
@@ -1436,7 +1485,7 @@ onMounted(async () => {
                                     Save Draft
                                 </button>
                                 <button
-                                    @click="editingQuoteId ? submitEditAndMaybeShare() : submitCreateAndSend()"
+                                    @click="editingQuoteId ? submitEditAndMaybeShare() : submitCreateAndDeliver()"
                                     :disabled="saving"
                                     class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
                                     style="background: #1f2937"
@@ -1461,7 +1510,7 @@ onMounted(async () => {
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                                         />
                                     </svg>
-                                    {{ editingQuoteId ? "Save Changes" : "Save & Send" }}
+                                    {{ editingQuoteId ? "Save Changes" : (downloadInsteadOfSend ? "Save & Download" : "Save & Send") }}
                                 </button>
                             </div>
                         </div>
@@ -1651,7 +1700,7 @@ onMounted(async () => {
                                             <td
                                                 class="px-4 py-3 text-center text-gray-700"
                                             >
-                                                {{ item.quantity }}
+                                                {{ fmtQty(item.quantity) }}
                                             </td>
                                             <td
                                                 class="px-4 py-3 text-right text-gray-700"

@@ -45,6 +45,7 @@ const form = ref({
   items: [defaultItem()] as FormItem[],
 })
 const includeVat = ref(true)
+const downloadInsteadOfSend = ref(false)
 
 const subtotal = computed(() => form.value.items.reduce((s, i) => s + i.qty * i.unit_price, 0))
 const vat = computed(() => (includeVat.value ? Math.round(subtotal.value * 0.16 * 100) / 100 : 0))
@@ -71,6 +72,7 @@ function openCreate() {
   editingInvId.value = null
   form.value = { quotation_id: 0, client: '', email: '', service: '', due_date: '', payment_method: '', terms: '', items: [defaultItem()] }
   includeVat.value = true
+  downloadInsteadOfSend.value = false
   createError.value = ''
   showCreate.value  = true
 }
@@ -107,20 +109,21 @@ function onQuotationSelect() {
   }
 }
 
-async function submitCreate(status?: string): Promise<Invoice | null> {
+async function submitCreate(status?: string, extra: Record<string, any> = {}): Promise<Invoice | null> {
   if (!form.value.client) { createError.value = 'Client name is required.'; return null }
   if (!form.value.items.some(i => i.description && i.unit_price > 0)) { createError.value = 'At least one line item with a description and price is required.'; return null }
   saving.value = true; createError.value = ''
   try {
     const payload: Record<string, any> = {
       client: form.value.client,
-      email: form.value.email,
+      email: form.value.email || null,
       service: form.value.service,
       due_date: form.value.due_date || null,
       payment_method: form.value.payment_method || null,
       terms: form.value.terms,
       vat_included: includeVat.value,
       items: form.value.items.map(i => ({ description: i.description, quantity: i.qty, unit_price: i.unit_price })),
+      ...extra,
     }
 
     let record: Invoice
@@ -147,7 +150,38 @@ async function submitCreate(status?: string): Promise<Invoice | null> {
 }
 
 async function submitCreateAndSend() {
+  if (!form.value.email) {
+    createError.value = 'Email is required to send the invoice — or check "Download instead" below.'
+    return
+  }
   await submitCreate('unpaid')
+}
+
+async function downloadInvoicePdf(inv: Invoice) {
+  const resp = await api.get(`/invoices/${inv.id}/download`, { responseType: 'blob' })
+  const url = URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `Invoice-${inv.invoice_number}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function submitCreateAndDownload() {
+  const record = await submitCreate('unpaid', { skip_email: true })
+  if (record) {
+    await downloadInvoicePdf(record)
+  }
+}
+
+async function submitCreateAndDeliver() {
+  if (downloadInsteadOfSend.value) {
+    await submitCreateAndDownload()
+  } else {
+    await submitCreateAndSend()
+  }
 }
 
 async function submitEditAndMaybeShare() {
@@ -221,6 +255,7 @@ async function printInvoice() {
   const phone          = s.contact?.phone || ''
   const phoneSecondary = s.contact?.phone_secondary || ''
   const email          = s.contact?.email || ''
+  const isTill         = (s.business?.mpesa_type || 'paybill') === 'till'
   const paybill        = s.business?.mpesa_shortcode || ''
   const paybillAcct    = s.business?.paybill_account || ''
 
@@ -235,7 +270,7 @@ async function printInvoice() {
   const itemRows = items.length ? items.map(i => `
         <tr>
           <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;">${i.description}</td>
-          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">${i.quantity}</td>
+          <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">${fmtQty(i.quantity)}</td>
           <td style="padding:9px 8px;border-bottom:1px solid #00BCD4;text-align:right;">Ksh ${Number(i.unit_price).toLocaleString()}</td>
           <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:right;font-weight:600;">Ksh ${Number(i.total).toLocaleString()}</td>
         </tr>`).join('')
@@ -354,8 +389,10 @@ table{width:100%;border-collapse:collapse}
 <div style="padding:20px 26px 0;">
   <div style="display:inline-block;">
     <div style="background:#111;color:#fff;padding:6px 16px;font-size:13px;font-weight:700;display:inline-block;margin-bottom:4px;">Payment Info:</div>
-    <div style="font-size:13px;padding:3px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
-    <div style="font-size:13px;padding:3px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>
+    ${isTill
+      ? `<div style="font-size:13px;padding:3px 2px;">Till Number: <strong>${paybill || '&mdash;'}</strong></div>`
+      : `<div style="font-size:13px;padding:3px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
+    <div style="font-size:13px;padding:3px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>`}
   </div>
 </div>
 
@@ -533,6 +570,9 @@ function hasBalanceDue(inv: Invoice): boolean {
   return inv.status !== 'draft' && Number(inv.paid_amount ?? 0) < Number(inv.amount)
 }
 function fmt(v: any) { return Number(v ?? 0).toLocaleString() }
+// Quantities arrive as decimal strings (e.g. "5.00") — show "5" for whole
+// numbers and "45.89" for fractional ones instead of always showing ".00".
+function fmtQty(v: any) { return Number(v ?? 0).toString() }
 function fmtDate(d?: string) { if (!d) return '-'; return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }
 
 onMounted(async () => {
@@ -715,7 +755,7 @@ onMounted(async () => {
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
                 <div class="col-span-2 sm:col-span-1">
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Client Email</label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Client Email <span class="text-gray-400 font-normal">(required to send)</span></label>
                   <input v-model="form.email" type="email" placeholder="email@example.com"
                     class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-cyan-500 transition-all"/>
                 </div>
@@ -757,7 +797,7 @@ onMounted(async () => {
                           <input v-model="item.description" placeholder="Item description" class="w-full border-0 focus:ring-0 text-sm px-1 py-1 outline-none"/>
                         </td>
                         <td class="px-2 py-1.5">
-                          <input v-model.number="item.qty" type="number" min="1" class="w-full border-0 focus:ring-0 text-sm text-center px-1 py-1 outline-none"/>
+                          <input v-model.number="item.qty" type="number" min="0.01" step="0.01" class="w-full border-0 focus:ring-0 text-sm text-center px-1 py-1 outline-none"/>
                         </td>
                         <td class="px-2 py-1.5">
                           <input v-model.number="item.unit_price" type="number" min="0" step="0.01" class="w-full border-0 focus:ring-0 text-sm text-right px-1 py-1 outline-none"/>
@@ -800,10 +840,18 @@ onMounted(async () => {
                 <template v-if="editingInvId">
                   After saving, you'll be asked whether to email the updated invoice to the client.
                 </template>
+                <template v-else-if="downloadInsteadOfSend">
+                  "Save &amp; Download" saves the invoice and downloads a PDF copy — nothing is emailed.
+                </template>
                 <template v-else>
                   "Save &amp; Send" also emails a PDF copy of this invoice to the client's address above.
                 </template>
               </p>
+              <label v-if="!editingInvId" class="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" v-model="downloadInsteadOfSend"
+                       class="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500/40">
+                <span class="text-sm text-gray-600">Download instead of emailing</span>
+              </label>
             </div>
             <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-between shrink-0">
               <p class="text-sm font-bold text-gray-900">Total: <span style="color:#00bcd4">Ksh {{ total.toLocaleString() }}</span></p>
@@ -813,11 +861,11 @@ onMounted(async () => {
                   class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors disabled:opacity-50">
                   Save Draft
                 </button>
-                <button @click="editingInvId ? submitEditAndMaybeShare() : submitCreateAndSend()" :disabled="saving"
+                <button @click="editingInvId ? submitEditAndMaybeShare() : submitCreateAndDeliver()" :disabled="saving"
                   class="px-5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:-translate-y-0.5"
                   style="background:#1F2937;">
                   <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  {{ editingInvId ? 'Save Changes' : 'Save & Send' }}
+                  {{ editingInvId ? 'Save Changes' : (downloadInsteadOfSend ? 'Save & Download' : 'Save & Send') }}
                 </button>
               </div>
             </div>
@@ -906,7 +954,7 @@ onMounted(async () => {
                     <tbody class="divide-y divide-gray-50">
                       <tr v-for="item in viewInv.items" :key="item.id">
                         <td class="px-4 py-2.5 text-gray-700">{{ item.description }}</td>
-                        <td class="px-4 py-2.5 text-center text-gray-700">{{ item.quantity }}</td>
+                        <td class="px-4 py-2.5 text-center text-gray-700">{{ fmtQty(item.quantity) }}</td>
                         <td class="px-4 py-2.5 text-right font-medium text-gray-900">Ksh {{ fmt(item.total) }}</td>
                       </tr>
                     </tbody>

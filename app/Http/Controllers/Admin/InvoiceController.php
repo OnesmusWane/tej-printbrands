@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 class InvoiceController extends Controller
@@ -18,7 +19,7 @@ class InvoiceController extends Controller
     private const ITEM_RULES = [
         'items' => ['sometimes', 'array', 'min:1'],
         'items.*.description' => ['required_with:items', 'string', 'max:255'],
-        'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
+        'items.*.quantity' => ['required_with:items', 'numeric', 'min:0.01'],
         'items.*.unit_price' => ['required_with:items', 'numeric', 'min:0'],
     ];
 
@@ -66,7 +67,10 @@ class InvoiceController extends Controller
 
         $invoice = $service->createInvoice($data);
 
-        if ($invoice->status !== 'draft') {
+        // An invoice created directly as non-draft is being delivered to the client
+        // now — either by emailing it (default) or, if the admin chose to download
+        // the PDF instead, skip_email suppresses the auto-send.
+        if ($invoice->status !== 'draft' && ! $request->boolean('skip_email')) {
             $this->emailInvoicePdf($invoice);
         }
 
@@ -141,6 +145,20 @@ class InvoiceController extends Controller
         $invoice->delete();
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    /**
+     * Generate the invoice PDF and stream it straight to the browser as a
+     * download — the "Save & Download" alternative to emailing it. The file is
+     * deleted the moment it's finished sending, same as the emailed copy.
+     */
+    public function download(Invoice $invoice): BinaryFileResponse
+    {
+        $pdfPath = app(InvoicePdfService::class)->generate($invoice);
+
+        return response()
+            ->download($pdfPath, "Invoice-{$invoice->invoice_number}.pdf")
+            ->deleteFileAfterSend(true);
     }
 
     /**

@@ -16,14 +16,14 @@ class StoreQuotationRequest extends FormRequest
         return [
             'quote_request_id' => ['nullable', 'integer', 'exists:quote_requests,id'],
             'client' => ['required', 'string', 'max:160'],
-            'email' => ['required', 'email', 'max:160'],
+            'email' => ['nullable', 'email', 'max:160'],
             'service' => ['nullable', 'string', 'max:160'],
             'status' => ['nullable', 'string', 'max:40'],
             'vat_included' => ['sometimes', 'boolean'],
             'terms' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['required', 'string', 'max:255'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ];
     }

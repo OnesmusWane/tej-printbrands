@@ -14,7 +14,7 @@ class QuotationItem extends Model
 
     protected function casts(): array
     {
-        return ['quantity' => 'integer', 'unit_price' => 'decimal:2', 'total' => 'decimal:2'];
+        return ['quantity' => 'decimal:2', 'unit_price' => 'decimal:2', 'total' => 'decimal:2'];
     }
 
     public function quotation(): BelongsTo

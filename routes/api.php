@@ -53,6 +53,7 @@ Route::middleware(['web', 'auth', 'admin'])->prefix('admin')->name('api.admin.')
     Route::patch('/quotations/{quotation}', [QuotationController::class, 'update'])->name('quotations.update');
     Route::delete('/quotations/{quotation}', [QuotationController::class, 'destroy'])->name('quotations.destroy');
     Route::post('/quotations/{quotation}/send', [QuotationController::class, 'send'])->name('quotations.send');
+    Route::get('/quotations/{quotation}/download', [QuotationController::class, 'download'])->name('quotations.download');
 
     // Invoices
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
@@ -61,6 +62,7 @@ Route::middleware(['web', 'auth', 'admin'])->prefix('admin')->name('api.admin.')
     Route::patch('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
     Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
     Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
+    Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
 
     // Service Requests
     Route::get('/service-requests', [ServiceRequestController::class, 'index'])->name('service-requests.index');

@@ -8,6 +8,7 @@
     $phone = $contact['phone'] ?? '';
     $phoneSecondary = $contact['phone_secondary'] ?? '';
     $email = $contact['email'] ?? '';
+    $isTill = ($business['mpesa_type'] ?? 'paybill') === 'till';
     $paybill = $business['mpesa_shortcode'] ?? '';
     $paybillAcct = $business['paybill_account'] ?? '';
 
@@ -82,7 +83,7 @@ table { border-collapse: collapse; width: 100%; }
         @forelse ($items as $i)
           <tr>
             <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;">{{ $i->description }}</td>
-            <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">{{ $i->quantity }}</td>
+            <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:center;">{{ rtrim(rtrim(number_format((float) $i->quantity, 2), '0'), '.') }}</td>
             <td style="padding:9px 8px;border-bottom:1px solid #00BCD4;text-align:right;">Ksh {{ number_format($i->unit_price) }}</td>
             <td style="padding:9px 14px;border-bottom:1px solid #00BCD4;text-align:right;font-weight:600;">Ksh {{ number_format($i->total) }}</td>
           </tr>
@@ -159,8 +160,12 @@ table { border-collapse: collapse; width: 100%; }
     <table style="width:auto;">
       <tr><td style="background:#111;color:#fff;padding:6px 16px;font-size:13px;font-weight:700;">Payment Info:</td></tr>
     </table>
-    <div style="font-size:13px;padding:6px 2px 0;">Paybill: <strong>{{ $paybill ?: '—' }}</strong></div>
-    <div style="font-size:13px;padding:3px 2px;">Account: <strong>{{ $paybillAcct ?: '—' }}</strong></div>
+    @if ($isTill)
+      <div style="font-size:13px;padding:6px 2px 0;">Till Number: <strong>{{ $paybill ?: '—' }}</strong></div>
+    @else
+      <div style="font-size:13px;padding:6px 2px 0;">Paybill: <strong>{{ $paybill ?: '—' }}</strong></div>
+      <div style="font-size:13px;padding:3px 2px;">Account: <strong>{{ $paybillAcct ?: '—' }}</strong></div>
+    @endif
   </div>
 
   <!-- ═══ FOOTER: pre-rendered curve + icons background, dynamic contact text overlaid ═══ -->

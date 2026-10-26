@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 class QuotationController extends Controller
@@ -53,8 +54,10 @@ class QuotationController extends Controller
                 ->update(['status' => 'quoted']);
         }
 
-        // A quotation created directly as 'pending' is being sent to the client now.
-        if ($quotation->status === 'pending') {
+        // A quotation created directly as 'pending' is being delivered to the client
+        // now — either by emailing it (default) or, if the admin chose to download
+        // the PDF instead, skip_email suppresses the auto-send.
+        if ($quotation->status === 'pending' && ! $request->boolean('skip_email')) {
             $this->emailQuotationPdf($quotation);
         }
 
@@ -77,7 +80,7 @@ class QuotationController extends Controller
             'status' => ['sometimes', 'in:draft,pending,approved,rejected'],
             'items' => ['sometimes', 'array', 'min:1'],
             'items.*.description' => ['required_with:items', 'string', 'max:255'],
-            'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
+            'items.*.quantity' => ['required_with:items', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['required_with:items', 'numeric', 'min:0'],
         ]);
 
@@ -129,6 +132,20 @@ class QuotationController extends Controller
         $quotation->delete();
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    /**
+     * Generate the quotation PDF and stream it straight to the browser as a
+     * download — the "Save & Download" alternative to emailing it. The file is
+     * deleted the moment it's finished sending, same as the emailed copy.
+     */
+    public function download(Quotation $quotation): BinaryFileResponse
+    {
+        $pdfPath = app(QuotationPdfService::class)->generate($quotation);
+
+        return response()
+            ->download($pdfPath, "Quotation-{$quotation->quote_number}.pdf")
+            ->deleteFileAfterSend(true);
     }
 
     /**

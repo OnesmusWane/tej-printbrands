@@ -139,7 +139,7 @@ class InvoicePaymentService
 
     private function createItem(Invoice $invoice, array $item): void
     {
-        $quantity = (int) Arr::get($item, 'quantity', 1);
+        $quantity = round((float) Arr::get($item, 'quantity', 1), 2);
         $unitPrice = round((float) Arr::get($item, 'unit_price', 0), 2);
 
         $invoice->items()->create([
@@ -152,7 +152,7 @@ class InvoicePaymentService
 
     private function totals(array $items, bool $vatIncluded): array
     {
-        $subtotal = round(collect($items)->sum(fn (array $item) => ((int) ($item['quantity'] ?? 1)) * ((float) ($item['unit_price'] ?? 0))), 2);
+        $subtotal = round(collect($items)->sum(fn (array $item) => ((float) ($item['quantity'] ?? 1)) * ((float) ($item['unit_price'] ?? 0))), 2);
         $tax = $vatIncluded ? round($subtotal * 0.16, 2) : 0;
 
         return ['subtotal' => $subtotal, 'tax' => $tax, 'amount' => round($subtotal + $tax, 2)];
