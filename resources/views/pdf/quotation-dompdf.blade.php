@@ -124,7 +124,8 @@ table { border-collapse: collapse; width: 100%; }
       <tr><td style="background:#111;color:#fff;padding:6px 16px;font-size:13px;font-weight:700;">Payment Info:</td></tr>
     </table>
     @if ($isTill)
-      <div style="font-size:13px;padding:6px 2px 0;">Till Number: <strong>{{ $paybill ?: '—' }}</strong></div>
+      <div style="font-size:13px;padding:6px 2px 0;">Buy Goods and Services</div>
+      <div style="font-size:13px;padding:3px 2px;">Till Number: <strong>{{ $paybill ?: '—' }}</strong></div>
     @else
       <div style="font-size:13px;padding:6px 2px 0;">Paybill: <strong>{{ $paybill ?: '—' }}</strong></div>
       <div style="font-size:13px;padding:3px 2px;">Account: <strong>{{ $paybillAcct ?: '—' }}</strong></div>

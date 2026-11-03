@@ -390,7 +390,8 @@ table{width:100%;border-collapse:collapse}
   <div style="display:inline-block;">
     <div style="background:#111;color:#fff;padding:6px 16px;font-size:13px;font-weight:700;display:inline-block;margin-bottom:4px;">Payment Info:</div>
     ${isTill
-      ? `<div style="font-size:13px;padding:3px 2px;">Till Number: <strong>${paybill || '&mdash;'}</strong></div>`
+      ? `<div style="font-size:13px;padding:3px 2px;">Buy Goods and Services</div>
+    <div style="font-size:13px;padding:3px 2px;">Till Number: <strong>${paybill || '&mdash;'}</strong></div>`
       : `<div style="font-size:13px;padding:3px 2px;">Paybill: <strong>${paybill || '&mdash;'}</strong></div>
     <div style="font-size:13px;padding:3px 2px;">Account: <strong>${paybillAcct || '&mdash;'}</strong></div>`}
   </div>
